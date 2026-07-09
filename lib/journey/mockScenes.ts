@@ -1,6 +1,12 @@
 import type { JourneyScene } from "./types";
 
-export const mockScenes: JourneyScene[] = [
+type MockScene = Omit<
+  JourneyScene,
+  "isActive" | "progressIsCompleted" | "progressIsUnlocked" | "contentBlocks" | "rewards"
+> &
+  Partial<Pick<JourneyScene, "isActive" | "progressIsCompleted" | "progressIsUnlocked" | "contentBlocks" | "rewards">>;
+
+const rawMockScenes: MockScene[] = [
   {
     id: "mock-welcome",
     slug: "welcome",
@@ -13,9 +19,6 @@ export const mockScenes: JourneyScene[] = [
     backgroundVariant: "night",
     isLocked: false,
     primaryActionLabel: "İlk sahneye geç",
-    isActive: true,
-    progressIsCompleted: false,
-    progressIsUnlocked: true,
   },
   {
     id: "mock-birthday-note",
@@ -27,9 +30,6 @@ export const mockScenes: JourneyScene[] = [
     sortOrder: 2,
     backgroundVariant: "rose",
     isLocked: false,
-    isActive: true,
-    progressIsCompleted: false,
-    progressIsUnlocked: true,
   },
   {
     id: "mock-anniversary-note",
@@ -41,9 +41,6 @@ export const mockScenes: JourneyScene[] = [
     sortOrder: 3,
     backgroundVariant: "deep",
     isLocked: false,
-    isActive: true,
-    progressIsCompleted: false,
-    progressIsUnlocked: true,
   },
   {
     id: "mock-small-task",
@@ -55,9 +52,28 @@ export const mockScenes: JourneyScene[] = [
     sortOrder: 4,
     backgroundVariant: "champagne",
     isLocked: false,
-    isActive: true,
-    progressIsCompleted: false,
-    progressIsUnlocked: true,
+    contentBlocks: [
+      {
+        id: "mock-small-task-photo",
+        type: "photo_task",
+        title: "Fotoğraf görevi",
+        body: "Bu görev fotoğraf çekme altyapısını göstermek için hazır.",
+        metadata: { reward_key: "mock-photo-reward" },
+        sortOrder: 10,
+      },
+    ],
+    rewards: [
+      {
+        id: "mock-photo-reward",
+        rewardKey: "mock-photo-reward",
+        title: "Küçük an kaydedildi",
+        subtitle: "Dev fallback ödülü",
+        body: "Fotoğraf kaydedildiğinde bu alan açılır.",
+        metadata: {},
+        sortOrder: 10,
+        isUnlocked: false,
+      },
+    ],
   },
   {
     id: "mock-first-memory",
@@ -70,9 +86,6 @@ export const mockScenes: JourneyScene[] = [
     sortOrder: 5,
     backgroundVariant: "night",
     isLocked: false,
-    isActive: true,
-    progressIsCompleted: false,
-    progressIsUnlocked: true,
   },
   {
     id: "mock-locked-surprise",
@@ -86,9 +99,6 @@ export const mockScenes: JourneyScene[] = [
     isLocked: true,
     unlockCondition: "small-task",
     primaryActionLabel: "Sırrı Aç",
-    isActive: true,
-    progressIsCompleted: false,
-    progressIsUnlocked: false,
   },
   {
     id: "mock-final",
@@ -105,8 +115,14 @@ export const mockScenes: JourneyScene[] = [
     sortOrder: 7,
     backgroundVariant: "deep",
     isLocked: false,
-    isActive: true,
-    progressIsCompleted: false,
-    progressIsUnlocked: true,
   },
 ];
+
+export const mockScenes: JourneyScene[] = rawMockScenes.map((scene) => ({
+  ...scene,
+  isActive: scene.isActive ?? true,
+  progressIsCompleted: scene.progressIsCompleted ?? false,
+  progressIsUnlocked: scene.progressIsUnlocked ?? !scene.isLocked,
+  contentBlocks: scene.contentBlocks ?? [],
+  rewards: scene.rewards ?? [],
+}));

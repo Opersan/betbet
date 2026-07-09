@@ -9,6 +9,10 @@ import { LockedRevealCard } from "@/components/ui/LockedRevealCard";
 import { FinalSurpriseCard } from "@/components/ui/FinalSurpriseCard";
 import { PremiumCard } from "@/components/ui/PremiumCard";
 import { PrimaryActionButton } from "@/components/ui/PrimaryActionButton";
+import { JourneyContentBlocks } from "@/components/ui/JourneyContentBlocks";
+import { MiniGameCard } from "@/components/ui/MiniGameCard";
+import { PhotoTaskCard } from "@/components/ui/PhotoTaskCard";
+import { RewardRevealStack } from "@/components/ui/RewardRevealStack";
 import { useJourneyScenes } from "@/hooks/useJourneyScenes";
 import type { JourneyScene } from "@/lib/journey/types";
 
@@ -22,10 +26,14 @@ export default function JourneyPage() {
     isLoading,
     isRefreshing,
     isCompleting,
+    isUploading,
     error,
     lastCompletedSlug,
     refreshScenes,
     completeScene,
+    submitPhotoTask,
+    completeMiniGame,
+    unlockReward,
     goNext,
     goPrevious,
   } = useJourneyScenes();
@@ -127,8 +135,11 @@ export default function JourneyPage() {
         ) : null}
         <SceneContent
           scene={currentScene}
-          isSubmitting={isCompleting}
+          isSubmitting={isCompleting || isUploading}
           onComplete={() => completeScene(currentScene.slug)}
+          onSubmitPhoto={(file, rewardKey) => submitPhotoTask(currentScene.slug, file, rewardKey)}
+          onCompleteMiniGame={(params) => completeMiniGame({ sceneSlug: currentScene.slug, ...params })}
+          onUnlockReward={(rewardKey) => unlockReward(currentScene.slug, rewardKey)}
         />
       </div>
     </MobileSceneLayout>
@@ -163,10 +174,21 @@ function SceneContent({
   scene,
   isSubmitting,
   onComplete,
+  onSubmitPhoto,
+  onCompleteMiniGame,
+  onUnlockReward,
 }: {
   scene: JourneyScene;
   isSubmitting: boolean;
   onComplete: () => void;
+  onSubmitPhoto: (file: File, rewardKey?: string | null) => void;
+  onCompleteMiniGame: (params: {
+    gameKey?: string;
+    score?: number | null;
+    rewardKey?: string | null;
+    payload?: Record<string, unknown>;
+  }) => void;
+  onUnlockReward: (rewardKey: string) => void;
 }) {
   if (scene.isLocked) {
     return (
@@ -180,24 +202,48 @@ function SceneContent({
   }
 
   if (scene.type === "task") {
+    if (scene.miniGame) {
+      return (
+        <TaskExperience>
+          <MiniGameCard scene={scene} isSubmitting={isSubmitting} onComplete={onCompleteMiniGame} />
+          <RewardRevealStack rewards={scene.rewards} isBusy={isSubmitting} onUnlock={onUnlockReward} />
+        </TaskExperience>
+      );
+    }
+
+    if (scene.contentBlocks.some((block) => block.type === "photo_task") || scene.taskResponse?.type === "photo") {
+      return (
+        <TaskExperience>
+          <PhotoTaskCard scene={scene} isSubmitting={isSubmitting} onSubmit={onSubmitPhoto} />
+          <RewardRevealStack rewards={scene.rewards} isBusy={isSubmitting} onUnlock={onUnlockReward} />
+        </TaskExperience>
+      );
+    }
+
     return (
-      <TaskCard
-        title={scene.content ?? scene.title}
-        isCompleted={scene.progressIsCompleted}
-        isSubmitting={isSubmitting}
-        onComplete={onComplete}
-      />
+      <TaskExperience>
+        <TaskCard
+          title={scene.content ?? scene.title}
+          isCompleted={scene.progressIsCompleted}
+          isSubmitting={isSubmitting}
+          onComplete={onComplete}
+        />
+        <RewardRevealStack rewards={scene.rewards} isBusy={isSubmitting} onUnlock={onUnlockReward} />
+      </TaskExperience>
     );
   }
 
   if (scene.type === "memory") {
     return (
-      <MemoryCard
-        imageUrl={scene.imageUrl}
-        dateLabel={scene.dateLabel}
-        title={scene.title}
-        content={scene.content}
-      />
+      <div className="w-full space-y-3">
+        <MemoryCard
+          imageUrl={scene.imageUrl}
+          dateLabel={scene.dateLabel}
+          title={scene.title}
+          content={scene.content}
+        />
+        <JourneyContentBlocks blocks={scene.contentBlocks} />
+      </div>
     );
   }
 
@@ -212,28 +258,40 @@ function SceneContent({
   }
 
   if (scene.type === "final") {
-    return <FinalSurpriseCard scene={scene} />;
+    return (
+      <div className="w-full space-y-3">
+        <FinalSurpriseCard scene={scene} />
+        <JourneyContentBlocks blocks={scene.contentBlocks} />
+      </div>
+    );
   }
 
   const icon = scene.type === "welcome" ? Sparkles : scene.slug.includes("anniversary") ? Heart : Gift;
 
   return (
-    <PremiumCard className="w-full p-6">
-      <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 text-[#f4dcc0]">
-        {icon === Heart ? <Heart size={21} strokeWidth={1.6} /> : icon === Gift ? <Gift size={21} strokeWidth={1.6} /> : <Sparkles size={21} strokeWidth={1.6} />}
-      </div>
-      {scene.dateLabel ? (
-        <p className="mb-3 text-xs font-medium uppercase tracking-[0.18em] text-[#f4dcc0]/78">
-          {scene.dateLabel}
-        </p>
-      ) : null}
-      <p className="text-2xl font-semibold leading-tight text-[#fffaf2]">{scene.content}</p>
-      {scene.progressIsCompleted ? (
-        <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 px-3 py-2 text-sm text-[#f4dcc0]">
-          <Check size={16} strokeWidth={1.8} />
-          Tamamlandı
+    <div className="w-full space-y-3">
+      <PremiumCard className="w-full p-6">
+        <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 text-[#f4dcc0]">
+          {icon === Heart ? <Heart size={21} strokeWidth={1.6} /> : icon === Gift ? <Gift size={21} strokeWidth={1.6} /> : <Sparkles size={21} strokeWidth={1.6} />}
         </div>
-      ) : null}
-    </PremiumCard>
+        {scene.dateLabel ? (
+          <p className="mb-3 text-xs font-medium uppercase tracking-[0.18em] text-[#f4dcc0]/78">
+            {scene.dateLabel}
+          </p>
+        ) : null}
+        <p className="text-2xl font-semibold leading-tight text-[#fffaf2]">{scene.content}</p>
+        {scene.progressIsCompleted ? (
+          <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 px-3 py-2 text-sm text-[#f4dcc0]">
+            <Check size={16} strokeWidth={1.8} />
+            Tamamlandı
+          </div>
+        ) : null}
+      </PremiumCard>
+      <JourneyContentBlocks blocks={scene.contentBlocks} />
+    </div>
   );
+}
+
+function TaskExperience({ children }: { children: React.ReactNode }) {
+  return <div className="w-full space-y-3">{children}</div>;
 }

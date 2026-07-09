@@ -2,6 +2,58 @@ export type SceneType = "welcome" | "story" | "task" | "memory" | "locked" | "fi
 
 export type BackgroundVariant = "night" | "rose" | "champagne" | "deep";
 
+export type JourneyContentBlock = {
+  id: string;
+  type: "text" | "quote" | "image" | "video" | "audio" | "divider" | "prompt" | "reward" | "game" | "photo_task";
+  title?: string | null;
+  body?: string | null;
+  mediaUrl?: string | null;
+  mediaPath?: string | null;
+  altText?: string | null;
+  metadata: Record<string, unknown>;
+  sortOrder: number;
+};
+
+export type JourneyTaskResponse = {
+  id: string;
+  responseKey: string;
+  type: "photo" | "mini_game" | "text" | "reward" | "generic";
+  status: "draft" | "submitted" | "completed";
+  storageBucket?: string | null;
+  storagePath?: string | null;
+  mediaUrl?: string | null;
+  score?: number | null;
+  rewardKey?: string | null;
+  payload: Record<string, unknown>;
+  completedAt?: string | null;
+  updatedAt?: string | null;
+};
+
+export type JourneyReward = {
+  id: string;
+  rewardKey: string;
+  title: string;
+  subtitle?: string | null;
+  body?: string | null;
+  imageUrl?: string | null;
+  videoUrl?: string | null;
+  metadata: Record<string, unknown>;
+  sortOrder: number;
+  isUnlocked: boolean;
+  unlockedAt?: string | null;
+};
+
+export type JourneyMiniGame = {
+  id: string;
+  gameKey: string;
+  type: "memory_match" | "tap_sequence" | "scratch_reveal" | "choice";
+  title: string;
+  instructions?: string | null;
+  config: Record<string, unknown>;
+  rewardKey?: string | null;
+  sortOrder: number;
+};
+
 export type JourneyScene = {
   id: string;
   slug: string;
@@ -21,6 +73,10 @@ export type JourneyScene = {
   progressIsCompleted: boolean;
   progressIsUnlocked: boolean;
   completedAt?: string | null;
+  contentBlocks: JourneyContentBlock[];
+  taskResponse?: JourneyTaskResponse | null;
+  rewards: JourneyReward[];
+  miniGame?: JourneyMiniGame | null;
 };
 
 export type JourneyAccessCode = {
@@ -60,6 +116,10 @@ export type JourneySceneRow = {
   progress_is_completed: boolean;
   progress_is_unlocked: boolean;
   completed_at: string | null;
+  content_blocks?: unknown;
+  task_response?: unknown;
+  rewards?: unknown;
+  mini_game?: unknown;
 };
 
 export type JourneyProgressRow = {

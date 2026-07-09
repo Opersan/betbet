@@ -2,10 +2,13 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  claimJourneyReward,
   completeJourneyScene,
   DEFAULT_JOURNEY_ACCESS_CODE,
   getJourneyScenes,
   initializeJourneyProgress,
+  saveJourneyTaskResponse,
+  uploadJourneyTaskPhoto,
 } from "@/lib/journey/queries";
 import { isSceneOpen, resolveInitialSceneIndex } from "@/lib/journey/progress";
 import type { JourneyScene } from "@/lib/journey/types";
@@ -27,6 +30,7 @@ export function useJourneyScenes() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isCompleting, setIsCompleting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastCompletedSlug, setLastCompletedSlug] = useState<string | null>(null);
 
@@ -157,6 +161,81 @@ export function useJourneyScenes() {
     [accessCode],
   );
 
+  const submitPhotoTask = useCallback(
+    async (sceneSlug: string, file: File, rewardKey?: string | null) => {
+      setIsUploading(true);
+      setError(null);
+
+      try {
+        await uploadJourneyTaskPhoto({ code: accessCode, sceneSlug, file, rewardKey });
+        const nextScenes = await refreshScenes({ nextSceneSlug: sceneSlug, preserveCurrentScene: false });
+        setScenes(nextScenes);
+        setLastCompletedSlug(sceneSlug);
+      } catch (caughtError) {
+        setError(getErrorMessage(caughtError));
+      } finally {
+        setIsUploading(false);
+      }
+    },
+    [accessCode, refreshScenes],
+  );
+
+  const completeMiniGame = useCallback(
+    async ({
+      sceneSlug,
+      gameKey = "primary",
+      score,
+      rewardKey,
+      payload = {},
+    }: {
+      sceneSlug: string;
+      gameKey?: string;
+      score?: number | null;
+      rewardKey?: string | null;
+      payload?: Record<string, unknown>;
+    }) => {
+      setIsCompleting(true);
+      setError(null);
+
+      try {
+        await saveJourneyTaskResponse({
+          code: accessCode,
+          sceneSlug,
+          responseType: "mini_game",
+          responseKey: gameKey,
+          score,
+          rewardKey,
+          payload,
+          completeScene: true,
+        });
+        await refreshScenes({ nextSceneSlug: sceneSlug, preserveCurrentScene: false });
+        setLastCompletedSlug(sceneSlug);
+      } catch (caughtError) {
+        setError(getErrorMessage(caughtError));
+      } finally {
+        setIsCompleting(false);
+      }
+    },
+    [accessCode, refreshScenes],
+  );
+
+  const unlockReward = useCallback(
+    async (sceneSlug: string, rewardKey: string) => {
+      setIsCompleting(true);
+      setError(null);
+
+      try {
+        await claimJourneyReward({ code: accessCode, sceneSlug, rewardKey });
+        await refreshScenes({ nextSceneSlug: sceneSlug, preserveCurrentScene: false });
+      } catch (caughtError) {
+        setError(getErrorMessage(caughtError));
+      } finally {
+        setIsCompleting(false);
+      }
+    },
+    [accessCode, refreshScenes],
+  );
+
   const value = useMemo(
     () => ({
       accessCode,
@@ -167,10 +246,14 @@ export function useJourneyScenes() {
       isLoading,
       isRefreshing,
       isCompleting,
+      isUploading,
       error,
       lastCompletedSlug,
       refreshScenes,
       completeScene,
+      submitPhotoTask,
+      completeMiniGame,
+      unlockReward,
       goNext,
       goPrevious,
       goToScene,
@@ -185,10 +268,14 @@ export function useJourneyScenes() {
       isLoading,
       isRefreshing,
       isCompleting,
+      isUploading,
       error,
       lastCompletedSlug,
       refreshScenes,
       completeScene,
+      submitPhotoTask,
+      completeMiniGame,
+      unlockReward,
       goNext,
       goPrevious,
       goToScene,
