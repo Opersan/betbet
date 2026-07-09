@@ -56,13 +56,14 @@ export default function JourneyPage() {
   useEffect(() => {
     if (!access?.id) return;
 
+    const accessId = access.id;
     let isMounted = true;
 
     async function loadJourney() {
       setIsLoading(true);
       const [remoteScenes, remoteProgress] = await Promise.all([
         getActiveJourneyScenes(),
-        getJourneyProgress(access.id),
+        getJourneyProgress(accessId),
       ]);
 
       if (!isMounted) return;
