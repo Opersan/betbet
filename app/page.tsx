@@ -20,7 +20,7 @@ export default function Home() {
           </div>
 
           <div className="space-y-4">
-            <p className="text-[2.65rem] font-semibold leading-[0.98] tracking-normal text-[#fffaf2]">
+            <p className="break-words text-[clamp(2.05rem,10vw,2.45rem)] font-semibold leading-[1.04] tracking-normal text-[#fffaf2] [text-wrap:balance]">
               Sana hazırladığım küçük bir gece.
             </p>
             <p className="max-w-[22rem] text-base leading-7 text-[#fffaf2]/72">

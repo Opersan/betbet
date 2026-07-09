@@ -1,3 +1,6 @@
+"use client";
+
+import { useState } from "react";
 import { Camera } from "lucide-react";
 import { PremiumCard } from "./PremiumCard";
 
@@ -12,14 +15,23 @@ export function MemoryCard({
   title: string;
   content?: string | null;
 }) {
+  const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
+  const showImage = Boolean(imageUrl && failedImageUrl !== imageUrl);
+
   return (
     <PremiumCard className="w-full p-4">
-      <div className="overflow-hidden rounded-[8px] border border-white/10 bg-white/[0.06]">
-        {imageUrl ? (
+      <div className="relative aspect-[4/5] max-h-[min(48dvh,22rem)] w-full overflow-hidden rounded-[8px] border border-white/10 bg-white/[0.06]">
+        {showImage ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img className="aspect-[4/5] w-full object-cover" src={imageUrl} alt={title} />
+          <img
+            className="absolute inset-0 h-full w-full object-cover"
+            src={imageUrl ?? undefined}
+            alt={title}
+            loading="lazy"
+            onError={() => setFailedImageUrl(imageUrl ?? null)}
+          />
         ) : (
-          <div className="flex aspect-[4/5] w-full items-center justify-center bg-[radial-gradient(circle_at_40%_30%,rgba(244,220,192,0.20),transparent_34%),linear-gradient(145deg,rgba(255,255,255,0.08),rgba(217,167,160,0.08))]">
+          <div className="absolute inset-0 flex items-center justify-center bg-[radial-gradient(circle_at_40%_30%,rgba(244,220,192,0.20),transparent_34%),linear-gradient(145deg,rgba(255,255,255,0.08),rgba(217,167,160,0.08))]">
             <div className="flex h-16 w-16 items-center justify-center rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 text-[#f4dcc0]">
               <Camera size={26} strokeWidth={1.5} />
             </div>

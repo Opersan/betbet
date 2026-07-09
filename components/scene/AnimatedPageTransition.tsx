@@ -23,7 +23,7 @@ export function AnimatedPageTransition({
         animate={{ opacity: 1, x: 0, filter: "blur(0px)" }}
         exit={reduceMotion ? undefined : { opacity: 0, x: -offset, filter: "blur(10px)" }}
         transition={{ duration: 0.48, ease: [0.16, 1, 0.3, 1] }}
-        className="flex min-h-0 w-full flex-1"
+        className="flex min-h-full w-full flex-1 items-center"
       >
         {children}
       </motion.div>

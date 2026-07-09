@@ -1,6 +1,7 @@
 "use client";
 
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import type { ReactNode } from "react";
 import { PrimaryActionButton } from "@/components/ui/PrimaryActionButton";
 
 export type SceneAction = {
@@ -19,6 +20,34 @@ export function BottomNavigationControls({
   nextAction?: () => void;
   primaryAction?: SceneAction;
 }) {
+  if (!primaryAction && !previousAction && !nextAction) {
+    return null;
+  }
+
+  const navActions = [
+    previousAction
+      ? {
+          key: "previous",
+          label: "Geri",
+          icon: <ArrowLeft size={17} strokeWidth={1.7} />,
+          onClick: previousAction,
+        }
+      : null,
+    nextAction && !primaryAction
+      ? {
+          key: "next",
+          label: "İleri",
+          icon: <ArrowRight size={17} strokeWidth={1.7} />,
+          onClick: nextAction,
+        }
+      : null,
+  ].filter(Boolean) as Array<{
+    key: string;
+    label: string;
+    icon: ReactNode;
+    onClick: () => void;
+  }>;
+
   return (
     <div className="space-y-3">
       {primaryAction ? (
@@ -32,26 +61,22 @@ export function BottomNavigationControls({
         </PrimaryActionButton>
       ) : null}
 
-      <div className="grid grid-cols-2 gap-3">
-        <button
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/12 bg-white/[0.07] px-4 text-sm font-medium text-[#fffaf2]/82 backdrop-blur transition active:translate-y-px disabled:opacity-35"
-          onClick={previousAction}
-          disabled={!previousAction}
-          type="button"
-        >
-          <ArrowLeft size={17} strokeWidth={1.7} />
-          Geri
-        </button>
-        <button
-          className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/12 bg-white/[0.07] px-4 text-sm font-medium text-[#fffaf2]/82 backdrop-blur transition active:translate-y-px disabled:opacity-35"
-          onClick={nextAction}
-          disabled={!nextAction}
-          type="button"
-        >
-          İleri
-          <ArrowRight size={17} strokeWidth={1.7} />
-        </button>
-      </div>
+      {navActions.length > 0 ? (
+        <div className={navActions.length === 1 ? "grid grid-cols-1 gap-3" : "grid grid-cols-2 gap-3"}>
+          {navActions.map((action) => (
+            <button
+              key={action.key}
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/12 bg-white/[0.07] px-4 text-sm font-medium text-[#fffaf2]/82 backdrop-blur transition hover:bg-white/[0.1] active:translate-y-px"
+              onClick={action.onClick}
+              type="button"
+            >
+              {action.key === "previous" ? action.icon : null}
+              {action.label}
+              {action.key === "next" ? action.icon : null}
+            </button>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

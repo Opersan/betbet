@@ -5,8 +5,19 @@ import { Heart, Sparkles } from "lucide-react";
 import type { JourneyScene } from "@/lib/journey/types";
 import { PremiumCard } from "./PremiumCard";
 
+const fallbackFinalContent = [
+  "Bugün sadece doğum günün değil.",
+  "Bizim hikayemizin de en güzel duraklarından biri.",
+  "Seni seviyorum.",
+  "Şimdi asıl sürpriz için bana bak.",
+].join("\n");
+
 export function FinalSurpriseCard({ scene }: { scene: JourneyScene }) {
   const reduceMotion = useReducedMotion();
+  const finalLines = (scene.content?.trim() || fallbackFinalContent)
+    .split(/\n+/)
+    .map((line) => line.trim())
+    .filter(Boolean);
 
   return (
     <motion.div
@@ -23,7 +34,13 @@ export function FinalSurpriseCard({ scene }: { scene: JourneyScene }) {
           <Sparkles className="text-[#d9a7a0]" size={22} strokeWidth={1.5} />
         </div>
         <p className="text-[2.35rem] font-semibold leading-[1.02] text-[#fffaf2]">{scene.title}</p>
-        {scene.content ? <p className="mt-6 text-lg leading-8 text-[#fffaf2]/78">{scene.content}</p> : null}
+        <div className="mt-6 space-y-4 text-lg leading-8 text-[#fffaf2]/80">
+          {finalLines.map((line) => (
+            <p key={line} className={line === "Seni seviyorum." ? "font-semibold text-[#f4dcc0]" : undefined}>
+              {line}
+            </p>
+          ))}
+        </div>
         <div className="mt-8 rounded-[8px] border border-[#f4dcc0]/18 bg-[#f4dcc0]/10 p-4 text-sm leading-6 text-[#f4dcc0]">
           Bu ekran final değil. Bu anın devamı gerçek hayatta.
         </div>

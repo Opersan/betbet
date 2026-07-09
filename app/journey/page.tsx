@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Check, Gift, Heart, Sparkles } from "lucide-react";
+import { Check, Gift, Heart, Sparkles } from "lucide-react";
 import { MobileSceneLayout } from "@/components/layout/MobileSceneLayout";
 import { MemoryCard } from "@/components/ui/MemoryCard";
 import { TaskCard } from "@/components/ui/TaskCard";
@@ -21,10 +21,12 @@ type StoredAccess = {
 };
 
 const ACCESS_STORAGE_KEY = "journey_access";
+let cachedAccessRaw: string | null | undefined;
+let cachedAccessSnapshot: StoredAccess | null = null;
 
 export default function JourneyPage() {
   const router = useRouter();
-  const [access, setAccess] = useState<StoredAccess | null>(null);
+  const access = useSyncExternalStore(subscribeToAccessStorage, getStoredAccessSnapshot, () => null);
   const [scenes, setScenes] = useState<JourneyScene[]>(mockScenes);
   const [progress, setProgress] = useState<JourneyProgress[]>([]);
   const [sceneIndex, setSceneIndex] = useState(0);
@@ -33,25 +35,11 @@ export default function JourneyPage() {
   const [revealedScenes, setRevealedScenes] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
-    const rawAccess = localStorage.getItem(ACCESS_STORAGE_KEY);
-
-    if (!rawAccess) {
-      router.replace("/unlock");
-      return;
-    }
-
-    try {
-      const parsed = JSON.parse(rawAccess) as StoredAccess;
-      if (!parsed.id) {
-        router.replace("/unlock");
-        return;
-      }
-      setAccess(parsed);
-    } catch {
+    if (!access) {
       localStorage.removeItem(ACCESS_STORAGE_KEY);
       router.replace("/unlock");
     }
-  }, [router]);
+  }, [access, router]);
 
   useEffect(() => {
     if (!access?.id) return;
@@ -88,6 +76,9 @@ export default function JourneyPage() {
   const canAccessCurrentScene = canAccessScene({ scene: currentScene, progress, previousScenes });
   const isCurrentCompleted = isSceneCompleted({ sceneId: currentScene.id, progress });
   const isRevealed = revealedScenes[currentScene.id] || canAccessCurrentScene;
+  const isWaitingForTask = currentScene.type === "task" && !isCurrentCompleted;
+  const isWaitingForReveal = currentScene.type === "locked" && !isRevealed;
+  const canNavigateNext = sceneIndex < scenes.length - 1 && !isWaitingForTask && !isWaitingForReveal;
 
   function goNext() {
     setDirection("forward");
@@ -152,7 +143,7 @@ export default function JourneyPage() {
       title={currentScene.title}
       subtitle={currentScene.subtitle ?? undefined}
       previousAction={sceneIndex > 0 ? goPrevious : undefined}
-      nextAction={sceneIndex < scenes.length - 1 ? goNext : undefined}
+      nextAction={canNavigateNext ? goNext : undefined}
       progress={{ current: sceneIndex + 1, total: scenes.length }}
       showSideArrows
       isLocked={currentScene.isLocked && !isRevealed}
@@ -162,8 +153,7 @@ export default function JourneyPage() {
         scene: currentScene,
         isCompleted: isCurrentCompleted,
         isRevealed,
-        canGoNext: sceneIndex < scenes.length - 1,
-        onComplete: completeCurrentScene,
+        canGoNext: canNavigateNext,
         onReveal: revealCurrentScene,
         onNext: goNext,
       })}
@@ -179,19 +169,54 @@ export default function JourneyPage() {
   );
 }
 
+function subscribeToAccessStorage(onStoreChange: () => void) {
+  if (typeof window === "undefined") {
+    return () => undefined;
+  }
+
+  window.addEventListener("storage", onStoreChange);
+  return () => window.removeEventListener("storage", onStoreChange);
+}
+
+function getStoredAccessSnapshot() {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  const rawAccess = localStorage.getItem(ACCESS_STORAGE_KEY);
+  if (rawAccess === cachedAccessRaw) {
+    return cachedAccessSnapshot;
+  }
+
+  cachedAccessRaw = rawAccess;
+
+  if (!rawAccess) {
+    cachedAccessSnapshot = null;
+    return cachedAccessSnapshot;
+  }
+
+  try {
+    const parsed = JSON.parse(rawAccess) as StoredAccess;
+    cachedAccessSnapshot = parsed.id ? parsed : null;
+  } catch {
+    cachedAccessSnapshot = null;
+  }
+
+  return cachedAccessSnapshot;
+}
+
 function getPrimaryAction(params: {
   scene: JourneyScene;
   isCompleted: boolean;
   isRevealed: boolean;
   canGoNext: boolean;
-  onComplete: () => void;
   onReveal: () => void;
   onNext: () => void;
 }) {
-  const { scene, isCompleted, isRevealed, canGoNext, onComplete, onReveal, onNext } = params;
+  const { scene, isCompleted, isRevealed, canGoNext, onReveal, onNext } = params;
 
   if (scene.type === "task" && !isCompleted) {
-    return { label: "Tamamladım", onClick: onComplete };
+    return undefined;
   }
 
   if (scene.type === "locked" && !isRevealed) {

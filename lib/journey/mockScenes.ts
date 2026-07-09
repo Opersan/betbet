@@ -78,8 +78,12 @@ export const mockScenes: JourneyScene[] = [
     type: "final",
     title: "İyi ki sen",
     subtitle: "İyi ki doğdun, iyi ki biz olduk.",
-    content:
-      "Bugün sadece doğum günün değil. Bizim hikayemizin de en güzel duraklarından biri. Seni seviyorum. Şimdi asıl sürpriz için bana bak.",
+    content: [
+      "Bugün sadece doğum günün değil.",
+      "Bizim hikayemizin de en güzel duraklarından biri.",
+      "Seni seviyorum.",
+      "Şimdi asıl sürpriz için bana bak.",
+    ].join("\n"),
     sortOrder: 7,
     backgroundVariant: "deep",
     isLocked: false,

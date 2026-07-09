@@ -41,23 +41,32 @@ export function MobileSceneLayout({
   backgroundVariant = "night",
 }: MobileSceneLayoutProps) {
   return (
-    <main className="relative min-h-[100dvh] overflow-hidden bg-[#070814] text-[#fffaf2]">
+    <main className="relative min-h-[100dvh] overflow-x-hidden bg-[#070814] text-[#fffaf2]">
       <SoftGradientBackground variant={backgroundVariant} />
       <FloatingParticles />
 
-      <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-[430px] flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))]">
+      <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-[430px] flex-col px-5 pt-[max(1.75rem,calc(env(safe-area-inset-top)+1rem))]">
         <section className="flex min-h-0 flex-1 flex-col">
-          <header className="shrink-0 pb-5 pt-5">
+          <header className="shrink-0 pb-4 pt-2">
             {progress ? (
               <div className="mb-5">
                 <ProgressDots current={progress.current} total={progress.total} />
               </div>
             ) : null}
-            {title ? <h1 className="text-[2.15rem] font-semibold leading-[1.04] tracking-normal">{title}</h1> : null}
+            {title ? (
+              <h1 className="break-words text-[clamp(1.78rem,7.4vw,2.05rem)] font-semibold leading-[1.08] tracking-normal [text-wrap:balance]">
+                {title}
+              </h1>
+            ) : null}
             {subtitle ? <p className="mt-3 text-base leading-7 text-[#fffaf2]/70">{subtitle}</p> : null}
           </header>
 
-          <div className={cn("relative flex min-h-0 flex-1 items-center pb-5", isLocked && "opacity-95")}>
+          <div
+            className={cn(
+              "relative flex min-h-0 flex-1 items-center overflow-y-auto overscroll-contain py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+              isLocked && "opacity-95",
+            )}
+          >
             {showSideArrows ? <SideArrowNavigation onPrevious={previousAction} onNext={nextAction} /> : null}
             <AnimatedPageTransition
               animationDirection={animationDirection}
@@ -68,7 +77,7 @@ export function MobileSceneLayout({
           </div>
         </section>
 
-        <footer className="shrink-0 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
+        <footer className="shrink-0 pb-[max(1rem,calc(env(safe-area-inset-bottom)+0.75rem))] pt-3">
           <BottomNavigationControls
             previousAction={previousAction}
             nextAction={nextAction}

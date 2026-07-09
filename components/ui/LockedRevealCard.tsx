@@ -1,6 +1,8 @@
 "use client";
 
+import { motion, useReducedMotion } from "framer-motion";
 import { LockKeyhole, Sparkles } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { PremiumCard } from "./PremiumCard";
 import { PrimaryActionButton } from "./PrimaryActionButton";
 import { RevealAnimation } from "./RevealAnimation";
@@ -16,22 +18,40 @@ export function LockedRevealCard({
   isRevealed: boolean;
   onReveal: () => void;
 }) {
+  const reduceMotion = useReducedMotion();
+
   return (
-    <PremiumCard className="w-full p-6">
+    <PremiumCard
+      className={cn(
+        "w-full p-6 transition duration-500",
+        isRevealed && "border-[#f4dcc0]/24 shadow-[0_22px_90px_rgba(217,167,160,0.18),inset_0_1px_0_rgba(255,255,255,0.16)]",
+      )}
+    >
       {!isRevealed ? (
         <div className="min-h-[18rem]">
           <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 text-[#f4dcc0]">
             <LockKeyhole size={21} strokeWidth={1.6} />
           </div>
-          <div className="select-none blur-[6px]">
-            <p className="text-3xl font-semibold leading-tight text-[#fffaf2]">{title}</p>
-            <p className="mt-5 text-base leading-7 text-[#fffaf2]/70">
-              Bu bölüm birazdan açılacak. Merak duygusu da hediyenin bir parçası.
-            </p>
+          <div className="relative select-none overflow-hidden rounded-[8px] border border-white/8 bg-white/[0.035] p-4">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_35%_10%,rgba(244,220,192,0.16),transparent_34%)]" />
+            <div className="relative blur-[6px] opacity-55">
+              <p className="text-3xl font-semibold leading-tight text-[#fffaf2]">{title}</p>
+              <p className="mt-5 text-base leading-7 text-[#fffaf2]/70">
+                Bu bölüm birazdan açılacak. Merak duygusu da hediyenin bir parçası.
+              </p>
+            </div>
           </div>
-          <div className="mt-8">
+          <motion.p
+            initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.48, ease: [0.16, 1, 0.3, 1] }}
+            className="mt-5 text-sm leading-6 text-[#f4dcc0]/72"
+          >
+            Hazır olduğunda yavaşça aç.
+          </motion.p>
+          <div className="mt-7">
             <PrimaryActionButton onClick={onReveal}>
-              Sürprizi Aç
+              Sırrı Aç
               <Sparkles size={18} strokeWidth={1.7} />
             </PrimaryActionButton>
           </div>
@@ -43,7 +63,7 @@ export function LockedRevealCard({
               <Sparkles size={21} strokeWidth={1.6} />
             </div>
             <p className="text-3xl font-semibold leading-tight text-[#fffaf2]">{title}</p>
-            {content ? <p className="mt-5 text-lg leading-8 text-[#fffaf2]/76">{content}</p> : null}
+            {content ? <p className="mt-5 text-lg leading-8 text-[#fffaf2]/80">{content}</p> : null}
           </div>
         </RevealAnimation>
       )}
