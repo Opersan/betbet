@@ -1,126 +1,34 @@
 "use client";
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from "react";
-import { useRouter } from "next/navigation";
-import { Check, Gift, Heart, Sparkles } from "lucide-react";
+import { Check, Gift, Heart, RotateCcw, Sparkles } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
 import { MobileSceneLayout } from "@/components/layout/MobileSceneLayout";
 import { MemoryCard } from "@/components/ui/MemoryCard";
 import { TaskCard } from "@/components/ui/TaskCard";
 import { LockedRevealCard } from "@/components/ui/LockedRevealCard";
 import { FinalSurpriseCard } from "@/components/ui/FinalSurpriseCard";
 import { PremiumCard } from "@/components/ui/PremiumCard";
-import { getActiveJourneyScenes, getJourneyProgress, markSceneCompleted, unlockScene } from "@/lib/journey/queries";
-import { canAccessScene, getInitialSceneIndex, isSceneCompleted } from "@/lib/journey/progress";
-import { mockScenes } from "@/lib/journey/mockScenes";
-import type { JourneyProgress, JourneyScene } from "@/lib/journey/types";
-
-type StoredAccess = {
-  id: string;
-  label?: string | null;
-  expiresAt?: string | null;
-};
-
-const ACCESS_STORAGE_KEY = "journey_access";
-let cachedAccessRaw: string | null | undefined;
-let cachedAccessSnapshot: StoredAccess | null = null;
+import { PrimaryActionButton } from "@/components/ui/PrimaryActionButton";
+import { useJourneyScenes } from "@/hooks/useJourneyScenes";
+import type { JourneyScene } from "@/lib/journey/types";
 
 export default function JourneyPage() {
-  const router = useRouter();
-  const access = useSyncExternalStore(subscribeToAccessStorage, getStoredAccessSnapshot, () => null);
-  const [scenes, setScenes] = useState<JourneyScene[]>(mockScenes);
-  const [progress, setProgress] = useState<JourneyProgress[]>([]);
-  const [sceneIndex, setSceneIndex] = useState(0);
-  const [direction, setDirection] = useState<"forward" | "backward">("forward");
-  const [isLoading, setIsLoading] = useState(true);
-  const [revealedScenes, setRevealedScenes] = useState<Record<string, boolean>>({});
-
-  useEffect(() => {
-    if (!access) {
-      localStorage.removeItem(ACCESS_STORAGE_KEY);
-      router.replace("/unlock");
-    }
-  }, [access, router]);
-
-  useEffect(() => {
-    if (!access?.id) return;
-
-    const accessId = access.id;
-    let isMounted = true;
-
-    async function loadJourney() {
-      setIsLoading(true);
-      const [remoteScenes, remoteProgress] = await Promise.all([
-        getActiveJourneyScenes(),
-        getJourneyProgress(accessId),
-      ]);
-
-      if (!isMounted) return;
-
-      const nextScenes = remoteScenes.length > 0 ? remoteScenes : mockScenes;
-      setScenes(nextScenes);
-      setProgress(remoteProgress);
-      setSceneIndex(getInitialSceneIndex({ scenes: nextScenes, progress: remoteProgress }));
-      setIsLoading(false);
-    }
-
-    loadJourney();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [access?.id]);
-
-  const currentScene = scenes[sceneIndex] ?? mockScenes[0];
-
-  const previousScenes = useMemo(() => scenes.slice(0, sceneIndex), [sceneIndex, scenes]);
-  const canAccessCurrentScene = canAccessScene({ scene: currentScene, progress, previousScenes });
-  const isCurrentCompleted = isSceneCompleted({ sceneId: currentScene.id, progress });
-  const isRevealed = revealedScenes[currentScene.id] || canAccessCurrentScene;
-  const isWaitingForTask = currentScene.type === "task" && !isCurrentCompleted;
-  const isWaitingForReveal = currentScene.type === "locked" && !isRevealed;
-  const canNavigateNext = sceneIndex < scenes.length - 1 && !isWaitingForTask && !isWaitingForReveal;
-
-  function goNext() {
-    setDirection("forward");
-    setSceneIndex((index) => Math.min(index + 1, scenes.length - 1));
-  }
-
-  function goPrevious() {
-    setDirection("backward");
-    setSceneIndex((index) => Math.max(index - 1, 0));
-  }
-
-  async function completeCurrentScene() {
-    if (!access?.id) return;
-
-    const optimisticProgress: JourneyProgress = {
-      id: `${access.id}-${currentScene.id}`,
-      accessCodeId: access.id,
-      sceneId: currentScene.id,
-      isCompleted: true,
-      isUnlocked: true,
-      completedAt: new Date().toISOString(),
-    };
-
-    setProgress((items) => {
-      const exists = items.some((item) => item.sceneId === currentScene.id);
-      return exists
-        ? items.map((item) =>
-            item.sceneId === currentScene.id
-              ? { ...item, isCompleted: true, isUnlocked: true, completedAt: item.completedAt ?? optimisticProgress.completedAt }
-              : item,
-          )
-        : [...items, optimisticProgress];
-    });
-
-    await markSceneCompleted({ accessCodeId: access.id, sceneId: currentScene.id });
-  }
-
-  async function revealCurrentScene() {
-    if (!access?.id) return;
-    setRevealedScenes((items) => ({ ...items, [currentScene.id]: true }));
-    await unlockScene({ accessCodeId: access.id, sceneId: currentScene.id });
-  }
+  const reduceMotion = useReducedMotion();
+  const {
+    scenes,
+    currentScene,
+    currentSceneIndex,
+    direction,
+    isLoading,
+    isRefreshing,
+    isCompleting,
+    error,
+    lastCompletedSlug,
+    refreshScenes,
+    completeScene,
+    goNext,
+    goPrevious,
+  } = useJourneyScenes();
 
   if (isLoading) {
     return (
@@ -131,96 +39,117 @@ export default function JourneyPage() {
       >
         <PremiumCard className="flex min-h-[18rem] w-full items-center justify-center p-6">
           <div className="h-2 w-28 overflow-hidden rounded-full bg-white/10">
-            <div className="h-full w-1/2 rounded-full bg-[#d9a7a0]" />
+            <motion.div
+              className="h-full w-1/2 rounded-full bg-[#d9a7a0]"
+              animate={reduceMotion ? undefined : { x: ["-20%", "120%"] }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+            />
           </div>
         </PremiumCard>
       </MobileSceneLayout>
     );
   }
 
+  if (error) {
+    return (
+      <MobileSceneLayout
+        title="Kapı aralık kaldı"
+        subtitle="Yolculuk bilgisi şu an tam yerine oturmadı."
+        backgroundVariant="deep"
+      >
+        <PremiumCard className="w-full p-6">
+          <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 text-[#f4dcc0]">
+            <RotateCcw size={21} strokeWidth={1.6} />
+          </div>
+          <p className="text-lg leading-8 text-[#fffaf2]/78">{error}</p>
+          <div className="mt-7">
+            <PrimaryActionButton onClick={() => refreshScenes({ preserveCurrentScene: false })} disabled={isRefreshing}>
+              {isRefreshing ? "Deneniyor" : "Tekrar Dene"}
+              <RotateCcw size={18} strokeWidth={1.7} />
+            </PrimaryActionButton>
+          </div>
+        </PremiumCard>
+      </MobileSceneLayout>
+    );
+  }
+
+  if (!currentScene) {
+    return (
+      <MobileSceneLayout
+        title="Henüz sahne yok"
+        subtitle="Bu yolculuğun sayfaları birazdan burada görünecek."
+        backgroundVariant="rose"
+      >
+        <PremiumCard className="w-full p-6">
+          <p className="text-lg leading-8 text-[#fffaf2]/78">
+            Şu an gösterilecek aktif bir sahne bulunamadı.
+          </p>
+        </PremiumCard>
+      </MobileSceneLayout>
+    );
+  }
+
+  const canNavigateNext = currentSceneIndex < scenes.length - 1;
+  const canNavigatePrevious = currentSceneIndex > 0;
+  const progressStates = scenes.map((scene) => {
+    if (scene.progressIsCompleted) return "completed";
+    if (scene.isLocked) return "locked";
+    return "unlocked";
+  });
+
   return (
     <MobileSceneLayout
       title={currentScene.title}
       subtitle={currentScene.subtitle ?? undefined}
-      previousAction={sceneIndex > 0 ? goPrevious : undefined}
+      previousAction={canNavigatePrevious ? goPrevious : undefined}
       nextAction={canNavigateNext ? goNext : undefined}
-      progress={{ current: sceneIndex + 1, total: scenes.length }}
+      progress={{ current: currentSceneIndex + 1, total: scenes.length, states: progressStates }}
       showSideArrows
-      isLocked={currentScene.isLocked && !isRevealed}
+      isLocked={currentScene.isLocked}
       animationDirection={direction}
       backgroundVariant={currentScene.backgroundVariant ?? "night"}
       primaryAction={getPrimaryAction({
         scene: currentScene,
-        isCompleted: isCurrentCompleted,
-        isRevealed,
         canGoNext: canNavigateNext,
-        onReveal: revealCurrentScene,
         onNext: goNext,
       })}
     >
-      <SceneContent
-        scene={currentScene}
-        isCompleted={isCurrentCompleted}
-        isRevealed={isRevealed}
-        onComplete={completeCurrentScene}
-        onReveal={revealCurrentScene}
-      />
+      <div className="relative w-full">
+        {lastCompletedSlug && !currentScene.isLocked ? (
+          <motion.div
+            initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+            className="mb-3 rounded-full border border-[#f4dcc0]/18 bg-[#f4dcc0]/10 px-4 py-2 text-center text-xs font-medium text-[#f4dcc0]/86"
+          >
+            Bir sayfa daha usulca açıldı.
+          </motion.div>
+        ) : null}
+        <SceneContent
+          scene={currentScene}
+          isSubmitting={isCompleting}
+          onComplete={() => completeScene(currentScene.slug)}
+        />
+      </div>
     </MobileSceneLayout>
   );
 }
 
-function subscribeToAccessStorage(onStoreChange: () => void) {
-  if (typeof window === "undefined") {
-    return () => undefined;
-  }
-
-  window.addEventListener("storage", onStoreChange);
-  return () => window.removeEventListener("storage", onStoreChange);
-}
-
-function getStoredAccessSnapshot() {
-  if (typeof window === "undefined") {
-    return null;
-  }
-
-  const rawAccess = localStorage.getItem(ACCESS_STORAGE_KEY);
-  if (rawAccess === cachedAccessRaw) {
-    return cachedAccessSnapshot;
-  }
-
-  cachedAccessRaw = rawAccess;
-
-  if (!rawAccess) {
-    cachedAccessSnapshot = null;
-    return cachedAccessSnapshot;
-  }
-
-  try {
-    const parsed = JSON.parse(rawAccess) as StoredAccess;
-    cachedAccessSnapshot = parsed.id ? parsed : null;
-  } catch {
-    cachedAccessSnapshot = null;
-  }
-
-  return cachedAccessSnapshot;
-}
-
-function getPrimaryAction(params: {
+function getPrimaryAction({
+  scene,
+  canGoNext,
+  onNext,
+}: {
   scene: JourneyScene;
-  isCompleted: boolean;
-  isRevealed: boolean;
   canGoNext: boolean;
-  onReveal: () => void;
   onNext: () => void;
 }) {
-  const { scene, isCompleted, isRevealed, canGoNext, onReveal, onNext } = params;
-
-  if (scene.type === "task" && !isCompleted) {
-    return undefined;
+  if (scene.isLocked) {
+    return { label: "Henüz Zamanı Değil", disabled: true };
   }
 
-  if (scene.type === "locked" && !isRevealed) {
-    return { label: scene.primaryActionLabel ?? "Sürprizi Aç", onClick: onReveal };
+  if (scene.type === "task" && !scene.progressIsCompleted) {
+    return undefined;
   }
 
   if (canGoNext) {
@@ -232,22 +161,30 @@ function getPrimaryAction(params: {
 
 function SceneContent({
   scene,
-  isCompleted,
-  isRevealed,
+  isSubmitting,
   onComplete,
-  onReveal,
 }: {
   scene: JourneyScene;
-  isCompleted: boolean;
-  isRevealed: boolean;
+  isSubmitting: boolean;
   onComplete: () => void;
-  onReveal: () => void;
 }) {
+  if (scene.isLocked) {
+    return (
+      <LockedRevealCard
+        title={scene.title}
+        isRevealed={false}
+        unlockCondition={scene.unlockCondition}
+        lockedLabel="Henüz Zamanı Değil"
+      />
+    );
+  }
+
   if (scene.type === "task") {
     return (
       <TaskCard
         title={scene.content ?? scene.title}
-        isCompleted={isCompleted}
+        isCompleted={scene.progressIsCompleted}
+        isSubmitting={isSubmitting}
         onComplete={onComplete}
       />
     );
@@ -269,8 +206,7 @@ function SceneContent({
       <LockedRevealCard
         title={scene.title}
         content={scene.content}
-        isRevealed={isRevealed}
-        onReveal={onReveal}
+        isRevealed
       />
     );
   }
@@ -292,7 +228,7 @@ function SceneContent({
         </p>
       ) : null}
       <p className="text-2xl font-semibold leading-tight text-[#fffaf2]">{scene.content}</p>
-      {isCompleted ? (
+      {scene.progressIsCompleted ? (
         <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 px-3 py-2 text-sm text-[#f4dcc0]">
           <Check size={16} strokeWidth={1.8} />
           Tamamlandı

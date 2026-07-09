@@ -9,10 +9,12 @@ import { PrimaryActionButton } from "./PrimaryActionButton";
 export function TaskCard({
   title,
   isCompleted,
+  isSubmitting = false,
   onComplete,
 }: {
   title: string;
   isCompleted: boolean;
+  isSubmitting?: boolean;
   onComplete: () => void;
 }) {
   const reduceMotion = useReducedMotion();
@@ -44,10 +46,10 @@ export function TaskCard({
       <div className="mt-7">
         <PrimaryActionButton
           onClick={onComplete}
-          disabled={isCompleted}
+          disabled={isCompleted || isSubmitting}
           className={isCompleted ? "bg-[#f4dcc0]/88 shadow-[0_18px_45px_rgba(244,220,192,0.16)]" : undefined}
         >
-          {isCompleted ? "Bu anı sakladık" : "Tamamladım"}
+          {isCompleted ? "Kalbime Kaydedildi" : isSubmitting ? "Kaydediliyor" : "Tamamladım"}
           <Check size={18} strokeWidth={1.8} />
         </PrimaryActionButton>
       </div>

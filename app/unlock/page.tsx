@@ -6,13 +6,12 @@ import { ArrowRight, LockKeyhole } from "lucide-react";
 import { MobileSceneLayout } from "@/components/layout/MobileSceneLayout";
 import { PremiumCard } from "@/components/ui/PremiumCard";
 import { PrimaryActionButton } from "@/components/ui/PrimaryActionButton";
-import { validateAccessCode } from "@/lib/journey/queries";
-
-const ACCESS_STORAGE_KEY = "journey_access";
+import { DEFAULT_JOURNEY_ACCESS_CODE, validateAccessCode } from "@/lib/journey/queries";
+import { JOURNEY_ACCESS_CODE_KEY, JOURNEY_LAST_LOADED_AT_KEY } from "@/hooks/useJourneyScenes";
 
 export default function UnlockPage() {
   const router = useRouter();
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(DEFAULT_JOURNEY_ACCESS_CODE);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -36,14 +35,8 @@ export default function UnlockPage() {
       return;
     }
 
-    localStorage.setItem(
-      ACCESS_STORAGE_KEY,
-      JSON.stringify({
-        id: accessCode.id,
-        label: accessCode.label,
-        expiresAt: accessCode.expiresAt,
-      }),
-    );
+    localStorage.setItem(JOURNEY_ACCESS_CODE_KEY, accessCode.code ?? trimmedCode);
+    localStorage.setItem(JOURNEY_LAST_LOADED_AT_KEY, new Date().toISOString());
 
     router.push("/journey");
   }

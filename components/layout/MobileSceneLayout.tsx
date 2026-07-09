@@ -5,7 +5,7 @@ import { SoftGradientBackground } from "@/components/background/SoftGradientBack
 import { FloatingParticles } from "@/components/background/FloatingParticles";
 import { AnimatedPageTransition } from "@/components/scene/AnimatedPageTransition";
 import { BottomNavigationControls, type SceneAction } from "@/components/scene/BottomNavigationControls";
-import { ProgressDots } from "@/components/scene/ProgressDots";
+import { ProgressDots, type ProgressDotState } from "@/components/scene/ProgressDots";
 import { SideArrowNavigation } from "@/components/scene/SideArrowNavigation";
 import type { BackgroundVariant } from "@/lib/journey/types";
 import { cn } from "@/lib/utils";
@@ -20,6 +20,7 @@ export type MobileSceneLayoutProps = {
   progress?: {
     current: number;
     total: number;
+    states?: ProgressDotState[];
   };
   showSideArrows?: boolean;
   isLocked?: boolean;
@@ -50,7 +51,7 @@ export function MobileSceneLayout({
           <header className="shrink-0 pb-4 pt-2">
             {progress ? (
               <div className="mb-5">
-                <ProgressDots current={progress.current} total={progress.total} />
+                <ProgressDots current={progress.current} total={progress.total} states={progress.states} />
               </div>
             ) : null}
             {title ? (

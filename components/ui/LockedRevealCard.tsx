@@ -12,11 +12,15 @@ export function LockedRevealCard({
   content,
   isRevealed,
   onReveal,
+  unlockCondition,
+  lockedLabel = "Henüz Zamanı Değil",
 }: {
   title: string;
   content?: string | null;
   isRevealed: boolean;
-  onReveal: () => void;
+  onReveal?: () => void;
+  unlockCondition?: string | null;
+  lockedLabel?: string;
 }) {
   const reduceMotion = useReducedMotion();
 
@@ -34,10 +38,10 @@ export function LockedRevealCard({
           </div>
           <div className="relative select-none overflow-hidden rounded-[8px] border border-white/8 bg-white/[0.035] p-4">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_35%_10%,rgba(244,220,192,0.16),transparent_34%)]" />
-            <div className="relative blur-[6px] opacity-55">
-              <p className="text-3xl font-semibold leading-tight text-[#fffaf2]">{title}</p>
+            <div className="relative opacity-90">
+              <p className="text-3xl font-semibold leading-tight text-[#fffaf2]">Henüz zamanı değil.</p>
               <p className="mt-5 text-base leading-7 text-[#fffaf2]/70">
-                Bu bölüm birazdan açılacak. Merak duygusu da hediyenin bir parçası.
+                Bu sayfa zamanı geldiğinde ya da küçük görevi tamamlayınca açılacak.
               </p>
             </div>
           </div>
@@ -47,12 +51,12 @@ export function LockedRevealCard({
             transition={{ duration: 0.48, ease: [0.16, 1, 0.3, 1] }}
             className="mt-5 text-sm leading-6 text-[#f4dcc0]/72"
           >
-            Hazır olduğunda yavaşça aç.
+            {unlockCondition ?? "Açılacağı ana kadar bu bölüm kapalı kalacak."}
           </motion.p>
           <div className="mt-7">
-            <PrimaryActionButton onClick={onReveal}>
-              Sırrı Aç
-              <Sparkles size={18} strokeWidth={1.7} />
+            <PrimaryActionButton disabled onClick={onReveal}>
+              {lockedLabel}
+              <LockKeyhole size={18} strokeWidth={1.7} />
             </PrimaryActionButton>
           </div>
         </div>

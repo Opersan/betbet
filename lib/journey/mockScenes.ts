@@ -13,6 +13,9 @@ export const mockScenes: JourneyScene[] = [
     backgroundVariant: "night",
     isLocked: false,
     primaryActionLabel: "İlk sahneye geç",
+    isActive: true,
+    progressIsCompleted: false,
+    progressIsUnlocked: true,
   },
   {
     id: "mock-birthday-note",
@@ -24,6 +27,9 @@ export const mockScenes: JourneyScene[] = [
     sortOrder: 2,
     backgroundVariant: "rose",
     isLocked: false,
+    isActive: true,
+    progressIsCompleted: false,
+    progressIsUnlocked: true,
   },
   {
     id: "mock-anniversary-note",
@@ -35,6 +41,9 @@ export const mockScenes: JourneyScene[] = [
     sortOrder: 3,
     backgroundVariant: "deep",
     isLocked: false,
+    isActive: true,
+    progressIsCompleted: false,
+    progressIsUnlocked: true,
   },
   {
     id: "mock-small-task",
@@ -46,6 +55,9 @@ export const mockScenes: JourneyScene[] = [
     sortOrder: 4,
     backgroundVariant: "champagne",
     isLocked: false,
+    isActive: true,
+    progressIsCompleted: false,
+    progressIsUnlocked: true,
   },
   {
     id: "mock-first-memory",
@@ -58,6 +70,9 @@ export const mockScenes: JourneyScene[] = [
     sortOrder: 5,
     backgroundVariant: "night",
     isLocked: false,
+    isActive: true,
+    progressIsCompleted: false,
+    progressIsUnlocked: true,
   },
   {
     id: "mock-locked-surprise",
@@ -71,6 +86,9 @@ export const mockScenes: JourneyScene[] = [
     isLocked: true,
     unlockCondition: "small-task",
     primaryActionLabel: "Sırrı Aç",
+    isActive: true,
+    progressIsCompleted: false,
+    progressIsUnlocked: false,
   },
   {
     id: "mock-final",
@@ -87,5 +105,8 @@ export const mockScenes: JourneyScene[] = [
     sortOrder: 7,
     backgroundVariant: "deep",
     isLocked: false,
+    isActive: true,
+    progressIsCompleted: false,
+    progressIsUnlocked: true,
   },
 ];

@@ -1,0 +1,237 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  completeJourneyScene,
+  DEFAULT_JOURNEY_ACCESS_CODE,
+  getJourneyScenes,
+  initializeJourneyProgress,
+} from "@/lib/journey/queries";
+import { isSceneOpen, resolveInitialSceneIndex } from "@/lib/journey/progress";
+import type { JourneyScene } from "@/lib/journey/types";
+
+export const JOURNEY_ACCESS_CODE_KEY = "romanticJourney.accessCode";
+export const JOURNEY_LAST_SCENE_KEY = "romanticJourney.lastSceneSlug";
+export const JOURNEY_LAST_LOADED_AT_KEY = "romanticJourney.lastLoadedAt";
+
+type RefreshOptions = {
+  nextSceneSlug?: string;
+  preserveCurrentScene?: boolean;
+};
+
+export function useJourneyScenes() {
+  const [accessCode, setAccessCode] = useState(() => readStorage(JOURNEY_ACCESS_CODE_KEY) || DEFAULT_JOURNEY_ACCESS_CODE);
+  const [scenes, setScenes] = useState<JourneyScene[]>([]);
+  const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
+  const [direction, setDirection] = useState<"forward" | "backward">("forward");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastCompletedSlug, setLastCompletedSlug] = useState<string | null>(null);
+
+  const currentScene = scenes[currentSceneIndex] ?? null;
+
+  const refreshScenes = useCallback(
+    async ({ nextSceneSlug, preserveCurrentScene = true }: RefreshOptions = {}) => {
+      setIsRefreshing(true);
+      setError(null);
+
+      try {
+        const nextScenes = await getJourneyScenes(accessCode);
+        setScenes(nextScenes);
+
+        const storedSlug = readStorage(JOURNEY_LAST_SCENE_KEY);
+        const currentSlug = preserveCurrentScene ? currentScene?.slug : null;
+        const preferredSlug = nextSceneSlug ?? currentSlug ?? storedSlug;
+        const nextIndex = resolveInitialSceneIndex(nextScenes, preferredSlug);
+        setCurrentSceneIndex(nextIndex);
+        writeStorage(JOURNEY_LAST_LOADED_AT_KEY, new Date().toISOString());
+
+        return nextScenes;
+      } catch (caughtError) {
+        setError(getErrorMessage(caughtError));
+        return [];
+      } finally {
+        setIsLoading(false);
+        setIsRefreshing(false);
+      }
+    },
+    [accessCode, currentScene],
+  );
+
+  useEffect(() => {
+    writeStorage(JOURNEY_ACCESS_CODE_KEY, accessCode);
+  }, [accessCode]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadJourney() {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        await initializeJourneyProgress(accessCode);
+        const nextScenes = await getJourneyScenes(accessCode);
+
+        if (!isMounted) return;
+
+        setScenes(nextScenes);
+        setCurrentSceneIndex(resolveInitialSceneIndex(nextScenes, readStorage(JOURNEY_LAST_SCENE_KEY)));
+        writeStorage(JOURNEY_LAST_LOADED_AT_KEY, new Date().toISOString());
+      } catch (caughtError) {
+        if (isMounted) {
+          setError(getErrorMessage(caughtError));
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
+      }
+    }
+
+    loadJourney();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [accessCode]);
+
+  useEffect(() => {
+    if (currentScene) {
+      writeStorage(JOURNEY_LAST_SCENE_KEY, currentScene.slug);
+    }
+  }, [currentScene]);
+
+  const goNext = useCallback(() => {
+    setDirection("forward");
+    setCurrentSceneIndex((index) => Math.min(index + 1, Math.max(scenes.length - 1, 0)));
+  }, [scenes.length]);
+
+  const goPrevious = useCallback(() => {
+    setDirection("backward");
+    setCurrentSceneIndex((index) => Math.max(index - 1, 0));
+  }, []);
+
+  const goToScene = useCallback(
+    (nextIndex: number) => {
+      setDirection(nextIndex >= currentSceneIndex ? "forward" : "backward");
+      setCurrentSceneIndex(Math.max(0, Math.min(nextIndex, Math.max(scenes.length - 1, 0))));
+    },
+    [currentSceneIndex, scenes.length],
+  );
+
+  const completeScene = useCallback(
+    async (sceneSlug: string) => {
+      setIsCompleting(true);
+      setError(null);
+
+      try {
+        await completeJourneyScene({ code: accessCode, sceneSlug });
+        const nextScenes = await getJourneyScenes(accessCode);
+        const completedIndex = nextScenes.findIndex((scene) => scene.slug === sceneSlug);
+        const nextOpenIndex = findNextOpenSceneIndex(nextScenes, completedIndex);
+        const nextSceneSlug = nextOpenIndex >= 0 ? nextScenes[nextOpenIndex]?.slug : sceneSlug;
+
+        setScenes(nextScenes);
+        setLastCompletedSlug(sceneSlug);
+
+        if (nextOpenIndex >= 0 && nextOpenIndex !== completedIndex) {
+          setDirection("forward");
+          setCurrentSceneIndex(nextOpenIndex);
+        } else {
+          setCurrentSceneIndex(resolveInitialSceneIndex(nextScenes, sceneSlug));
+        }
+
+        writeStorage(JOURNEY_LAST_LOADED_AT_KEY, new Date().toISOString());
+        if (nextSceneSlug) {
+          writeStorage(JOURNEY_LAST_SCENE_KEY, nextSceneSlug);
+        }
+      } catch (caughtError) {
+        setError(getErrorMessage(caughtError));
+      } finally {
+        setIsCompleting(false);
+      }
+    },
+    [accessCode],
+  );
+
+  const value = useMemo(
+    () => ({
+      accessCode,
+      scenes,
+      currentScene,
+      currentSceneIndex,
+      direction,
+      isLoading,
+      isRefreshing,
+      isCompleting,
+      error,
+      lastCompletedSlug,
+      refreshScenes,
+      completeScene,
+      goNext,
+      goPrevious,
+      goToScene,
+      setAccessCode,
+    }),
+    [
+      accessCode,
+      scenes,
+      currentScene,
+      currentSceneIndex,
+      direction,
+      isLoading,
+      isRefreshing,
+      isCompleting,
+      error,
+      lastCompletedSlug,
+      refreshScenes,
+      completeScene,
+      goNext,
+      goPrevious,
+      goToScene,
+    ],
+  );
+
+  return value;
+}
+
+function findNextOpenSceneIndex(scenes: JourneyScene[], fromIndex: number) {
+  if (fromIndex < 0) {
+    return -1;
+  }
+
+  for (let index = fromIndex + 1; index < scenes.length; index += 1) {
+    if (isSceneOpen(scenes[index])) {
+      return index;
+    }
+  }
+
+  return -1;
+}
+
+function readStorage(key: string) {
+  if (typeof window === "undefined") {
+    return null;
+  }
+
+  return window.localStorage.getItem(key);
+}
+
+function writeStorage(key: string, value: string) {
+  if (typeof window === "undefined") {
+    return;
+  }
+
+  window.localStorage.setItem(key, value);
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "Yolculuk su an acilamadi. Birazdan yeniden deneyelim.";
+}

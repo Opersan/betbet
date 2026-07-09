@@ -1,60 +1,43 @@
-import type { JourneyProgress, JourneyScene } from "./types";
+import type { JourneyScene } from "./types";
 
-export function canAccessScene({
-  scene,
-  progress,
-  previousScenes,
-}: {
-  scene: JourneyScene;
-  progress: JourneyProgress[];
-  previousScenes: JourneyScene[];
-}) {
-  if (previousScenes.length === 0) {
-    return true;
+export function resolveInitialSceneIndex(scenes: JourneyScene[], lastSceneSlug?: string | null) {
+  if (scenes.length === 0) {
+    return 0;
   }
 
-  if (!scene.isLocked) {
-    return true;
+  if (lastSceneSlug) {
+    const storedIndex = scenes.findIndex((scene) => scene.slug === lastSceneSlug && isSceneOpen(scene));
+    if (storedIndex >= 0) {
+      return storedIndex;
+    }
   }
 
-  const sceneProgress = progress.find((item) => item.sceneId === scene.id);
-  if (sceneProgress?.isUnlocked || sceneProgress?.isCompleted) {
-    return true;
+  const firstOpenIncompleteTaskIndex = scenes.findIndex(
+    (scene) => isSceneOpen(scene) && scene.type === "task" && !scene.progressIsCompleted,
+  );
+  if (firstOpenIncompleteTaskIndex >= 0) {
+    return firstOpenIncompleteTaskIndex;
   }
 
-  if (!scene.unlockCondition) {
-    return false;
+  const lastOpenIndex = findLastIndex(scenes, isSceneOpen);
+  if (lastOpenIndex >= 0) {
+    return lastOpenIndex;
   }
 
-  const requiredScene = previousScenes.find((item) => item.slug === scene.unlockCondition);
-  if (!requiredScene) {
-    return false;
-  }
-
-  return progress.some((item) => item.sceneId === requiredScene.id && item.isCompleted);
+  const firstOpenIndex = scenes.findIndex(isSceneOpen);
+  return firstOpenIndex >= 0 ? firstOpenIndex : 0;
 }
 
-export function getInitialSceneIndex({
-  scenes,
-  progress,
-}: {
-  scenes: JourneyScene[];
-  progress: JourneyProgress[];
-}) {
-  const firstIncompleteIndex = scenes.findIndex((scene, index) => {
-    const previousScenes = scenes.slice(0, index);
-    return canAccessScene({ scene, progress, previousScenes }) && !isSceneCompleted({ sceneId: scene.id, progress });
-  });
-
-  return firstIncompleteIndex >= 0 ? firstIncompleteIndex : 0;
+export function isSceneOpen(scene: JourneyScene) {
+  return !scene.isLocked;
 }
 
-export function isSceneCompleted({
-  sceneId,
-  progress,
-}: {
-  sceneId: string;
-  progress: JourneyProgress[];
-}) {
-  return progress.some((item) => item.sceneId === sceneId && item.isCompleted);
+function findLastIndex<T>(items: T[], predicate: (item: T) => boolean) {
+  for (let index = items.length - 1; index >= 0; index -= 1) {
+    if (predicate(items[index])) {
+      return index;
+    }
+  }
+
+  return -1;
 }
