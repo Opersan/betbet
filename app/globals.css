@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #070814;
+  --foreground: #fffaf2;
+  --rose-gold: #d9a7a0;
+  --champagne: #f4dcc0;
+  --soft-pink: #f0b7c6;
 }
 
 @theme inline {
@@ -22,5 +25,25 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+::selection {
+  background: rgb(217 167 160 / 0.28);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
 }

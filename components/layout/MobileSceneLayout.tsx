@@ -1,0 +1,81 @@
+"use client";
+
+import type { ReactNode } from "react";
+import { SoftGradientBackground } from "@/components/background/SoftGradientBackground";
+import { FloatingParticles } from "@/components/background/FloatingParticles";
+import { AnimatedPageTransition } from "@/components/scene/AnimatedPageTransition";
+import { BottomNavigationControls, type SceneAction } from "@/components/scene/BottomNavigationControls";
+import { ProgressDots } from "@/components/scene/ProgressDots";
+import { SideArrowNavigation } from "@/components/scene/SideArrowNavigation";
+import type { BackgroundVariant } from "@/lib/journey/types";
+import { cn } from "@/lib/utils";
+
+export type MobileSceneLayoutProps = {
+  title?: string;
+  subtitle?: string;
+  children: ReactNode;
+  previousAction?: () => void;
+  nextAction?: () => void;
+  primaryAction?: SceneAction;
+  progress?: {
+    current: number;
+    total: number;
+  };
+  showSideArrows?: boolean;
+  isLocked?: boolean;
+  animationDirection?: "forward" | "backward";
+  backgroundVariant?: BackgroundVariant;
+};
+
+export function MobileSceneLayout({
+  title,
+  subtitle,
+  children,
+  previousAction,
+  nextAction,
+  primaryAction,
+  progress,
+  showSideArrows = false,
+  isLocked = false,
+  animationDirection = "forward",
+  backgroundVariant = "night",
+}: MobileSceneLayoutProps) {
+  return (
+    <main className="relative min-h-[100dvh] overflow-hidden bg-[#070814] text-[#fffaf2]">
+      <SoftGradientBackground variant={backgroundVariant} />
+      <FloatingParticles />
+
+      <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-[430px] flex-col px-5 pt-[max(1.25rem,env(safe-area-inset-top))]">
+        <section className="flex min-h-0 flex-1 flex-col">
+          <header className="shrink-0 pb-5 pt-5">
+            {progress ? (
+              <div className="mb-5">
+                <ProgressDots current={progress.current} total={progress.total} />
+              </div>
+            ) : null}
+            {title ? <h1 className="text-[2.15rem] font-semibold leading-[1.04] tracking-normal">{title}</h1> : null}
+            {subtitle ? <p className="mt-3 text-base leading-7 text-[#fffaf2]/70">{subtitle}</p> : null}
+          </header>
+
+          <div className={cn("relative flex min-h-0 flex-1 items-center pb-5", isLocked && "opacity-95")}>
+            {showSideArrows ? <SideArrowNavigation onPrevious={previousAction} onNext={nextAction} /> : null}
+            <AnimatedPageTransition
+              animationDirection={animationDirection}
+              transitionKey={`${progress?.current ?? 0}-${title ?? "scene"}`}
+            >
+              {children}
+            </AnimatedPageTransition>
+          </div>
+        </section>
+
+        <footer className="shrink-0 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
+          <BottomNavigationControls
+            previousAction={previousAction}
+            nextAction={nextAction}
+            primaryAction={primaryAction}
+          />
+        </footer>
+      </div>
+    </main>
+  );
+}

@@ -1,36 +1,49 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 20 Temmuz Mobil Hikaye Deneyimi
 
-## Getting Started
+QR kod ile açılması hedeflenen, mobil-first romantik hikaye web uygulaması.
 
-First, run the development server:
+## Stack
+
+- Next.js App Router
+- TypeScript
+- Tailwind CSS
+- Framer Motion
+- Supabase MCP ile hazırlanmış Database ve RPC katmanı
+- Vercel uyumlu env yapısı
+
+## Local Run
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Varsayılan yerel adres: `http://localhost:3000`
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Supabase
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`.env.local` içinde yalnızca publishable key bulunur. Service role key kullanılmaz.
 
-## Learn More
+MCP ile hazırlanan public tablolar:
 
-To learn more about Next.js, take a look at the following resources:
+- `journey_scenes`
+- `journey_access_codes`
+- `journey_progress`
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Access code doğrulaması direct table read ile değil, `validate_journey_access_code` RPC ile yapılır.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+İlk MVP erişim kodu Supabase tarafında `20TEMMUZ` olarak oluşturuldu.
 
-## Deploy on Vercel
+## Manual Checklist
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- iPhone viewport
+- Android Chrome viewport
+- Desktop mobil frame merkezleme
+- `/journey` access olmadan redirect
+- Geçerli ve hatalı access code
+- Supabase data yoksa mock fallback
+- İleri ve geri animasyon yönleri
+- Task completion state
+- Locked reveal
+- Final surprise
+- Safe-area çakışması
+- Görsel olan ve olmayan sahnelerde layout stabilitesi
