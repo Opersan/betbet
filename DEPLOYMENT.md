@@ -7,7 +7,7 @@ Required public env vars:
 
 Optional private env vars:
 
-- `JOURNEY_PREVIEW_TOKEN`: required in production for `/journey/preview?token=...`, which shows active Supabase scene content including locked scenes for manual review.
+- `JOURNEY_PREVIEW_TOKEN`: required in production for `/journey/preview?token=20TEMMUZ-PREVIEW`, which opens the playable preview flow for locked scenes. The value must match the preview RPC rule: access code + `-PREVIEW`.
 
 Supabase objects required by the current frontend have been applied to the connected project:
 
@@ -25,6 +25,6 @@ After deploy, verify on mobile:
 
 - `/unlock` accepts `20TEMMUZ`.
 - `/journey` loads from RPC.
-- `/journey/preview?token=YOUR_TOKEN` shows locked scene content only when `JOURNEY_PREVIEW_TOKEN` is configured.
+- `/journey/preview?token=20TEMMUZ-PREVIEW` shows all scenes unlocked and lets you test mini games locally without changing public journey progress.
 - A photo task can open camera/file picker.
 - Completed task state survives refresh.

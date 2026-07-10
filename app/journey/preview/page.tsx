@@ -12,6 +12,7 @@ export default async function JourneyPreviewPage({ searchParams }: { searchParam
   const token = firstParam(params.token);
   const code = firstParam(params.code) ?? "20TEMMUZ";
   const access = getPreviewAccess(token);
+  const previewToken = token ?? `${code}-PREVIEW`;
 
   if (!access.allowed) {
     return (
@@ -34,13 +35,7 @@ export default async function JourneyPreviewPage({ searchParams }: { searchParam
     );
   }
 
-  return (
-    <JourneyPreviewClient
-      code={code}
-      supabaseUrl={process.env.NEXT_PUBLIC_SUPABASE_URL ?? null}
-      supabaseKey={process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? null}
-    />
-  );
+  return <JourneyPreviewClient code={code} previewToken={previewToken} />;
 }
 
 function firstParam(value: string | string[] | undefined) {

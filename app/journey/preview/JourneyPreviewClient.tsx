@@ -1,397 +1,464 @@
 "use client";
 
-import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Eye, Gamepad2, Gift, Lock, Sparkles, Unlock } from "lucide-react";
+import { Check, Eye, Gift, Heart, RotateCcw, Sparkles } from "lucide-react";
+import { motion, useReducedMotion } from "framer-motion";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { MobileSceneLayout } from "@/components/layout/MobileSceneLayout";
+import { JourneyContentBlocks } from "@/components/ui/JourneyContentBlocks";
+import { MemoryCard } from "@/components/ui/MemoryCard";
+import { MiniGameCard } from "@/components/ui/MiniGameCard";
+import { PhotoTaskCard } from "@/components/ui/PhotoTaskCard";
 import { PremiumCard } from "@/components/ui/PremiumCard";
+import { PrimaryActionButton } from "@/components/ui/PrimaryActionButton";
+import { RewardRevealStack } from "@/components/ui/RewardRevealStack";
+import { TaskCard } from "@/components/ui/TaskCard";
+import { getJourneyPreviewScenes } from "@/lib/journey/queries";
+import type { JourneyReward, JourneyScene, JourneyTaskResponse } from "@/lib/journey/types";
 
-type PreviewScene = {
-  id: string;
-  slug: string;
-  type: string;
-  title: string;
-  subtitle: string | null;
-  content: string | null;
-  image_url: string | null;
-  video_url: string | null;
-  date_label: string | null;
-  sort_order: number;
-  background_variant: string | null;
-  is_locked: boolean;
-  unlock_condition: string | null;
+type CompleteMiniGameParams = {
+  gameKey?: string;
+  score?: number | null;
+  rewardKey?: string | null;
+  payload?: Record<string, unknown>;
 };
-
-type PreviewBlock = {
-  id: string;
-  scene_slug: string;
-  block_type: string;
-  title: string | null;
-  body: string | null;
-  media_url: string | null;
-  media_path: string | null;
-  alt_text: string | null;
-  metadata: Record<string, unknown>;
-  sort_order: number;
-};
-
-type PreviewMiniGame = {
-  id: string;
-  scene_slug: string;
-  game_key: string;
-  game_type: string;
-  title: string;
-  instructions: string | null;
-  config: Record<string, unknown>;
-  reward_key: string | null;
-  sort_order: number;
-};
-
-type PreviewReward = {
-  id: string;
-  scene_slug: string;
-  reward_key: string;
-  title: string;
-  subtitle: string | null;
-  body: string | null;
-  image_url: string | null;
-  video_url: string | null;
-  metadata: Record<string, unknown>;
-  sort_order: number;
-};
-
-type RpcSceneStatus = {
-  slug: string;
-  is_locked: boolean;
-  progress_is_unlocked: boolean;
-  progress_is_completed: boolean;
-};
-
-type SceneBundle = {
-  scene: PreviewScene;
-  blocks: PreviewBlock[];
-  games: PreviewMiniGame[];
-  rewards: PreviewReward[];
-  status?: RpcSceneStatus;
-};
-
-type PreviewState =
-  | { status: "loading" }
-  | { status: "error"; error: string }
-  | { status: "ready"; bundles: SceneBundle[] };
 
 export function JourneyPreviewClient({
-  supabaseUrl,
-  supabaseKey,
   code,
+  previewToken,
 }: {
-  supabaseUrl: string | null;
-  supabaseKey: string | null;
   code: string;
+  previewToken: string;
 }) {
-  const [state, setState] = useState<PreviewState>({ status: "loading" });
+  const reduceMotion = useReducedMotion();
+  const [scenes, setScenes] = useState<JourneyScene[]>([]);
+  const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
+  const [direction, setDirection] = useState<"forward" | "backward">("forward");
+  const [isLoading, setIsLoading] = useState(true);
+  const [isBusy, setIsBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [lastCompletedSlug, setLastCompletedSlug] = useState<string | null>(null);
+
+  const currentScene = scenes[currentSceneIndex] ?? null;
+
+  const refreshPreview = useCallback(
+    async (preferredSlug?: string) => {
+      setIsLoading(true);
+      setError(null);
+
+      try {
+        const nextScenes = await getJourneyPreviewScenes({ code, previewToken });
+        const normalizedScenes = nextScenes.map(resetForPreview);
+        setScenes(normalizedScenes);
+
+        const nextIndex = preferredSlug
+          ? Math.max(0, normalizedScenes.findIndex((scene) => scene.slug === preferredSlug))
+          : findFirstPlayableIndex(normalizedScenes);
+        setCurrentSceneIndex(nextIndex >= 0 ? nextIndex : 0);
+      } catch (caughtError) {
+        setError(getErrorMessage(caughtError));
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [code, previewToken],
+  );
 
   useEffect(() => {
     let isMounted = true;
 
-    async function loadPreview() {
-      if (!supabaseUrl || !supabaseKey) {
-        setState({
-          status: "error",
-          error: "Supabase env eksik: NEXT_PUBLIC_SUPABASE_URL ve publishable key gerekli.",
-        });
-        return;
+    async function loadInitialPreview() {
+      try {
+        const nextScenes = await getJourneyPreviewScenes({ code, previewToken });
+        if (!isMounted) return;
+
+        const normalizedScenes = nextScenes.map(resetForPreview);
+        setScenes(normalizedScenes);
+        setCurrentSceneIndex(findFirstPlayableIndex(normalizedScenes));
+      } catch (caughtError) {
+        if (isMounted) {
+          setError(getErrorMessage(caughtError));
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
-
-      const result = await getPreviewBundles({ supabaseUrl, supabaseKey, code });
-      if (!isMounted) return;
-
-      setState(result.ok ? { status: "ready", bundles: result.bundles } : { status: "error", error: result.error });
     }
 
-    loadPreview();
+    loadInitialPreview();
 
     return () => {
       isMounted = false;
     };
-  }, [code, supabaseKey, supabaseUrl]);
+  }, [code, previewToken]);
 
   const summary = useMemo(() => {
-    if (state.status !== "ready") {
-      return "Kilitli sahne içerikleri yükleniyor.";
-    }
+    const gameCount = scenes.filter((scene) => scene.miniGame).length;
+    return scenes.length > 0
+      ? `${scenes.length} sahne, ${gameCount} mini game - tüm kilitler preview için açık`
+      : "Tüm kilitli sahneler preview için hazırlanıyor.";
+  }, [scenes]);
 
-    const lockedCount = state.bundles.filter((item) => item.scene.is_locked || item.status?.is_locked).length;
-    const gameCount = state.bundles.reduce((total, item) => total + item.games.length, 0);
-    return `${state.bundles.length} sahne, ${lockedCount} kilitli, ${gameCount} mini game`;
-  }, [state]);
+  const canNavigateNext = currentSceneIndex < scenes.length - 1;
+  const canNavigatePrevious = currentSceneIndex > 0;
+  const progressStates = scenes.map((scene) => (scene.progressIsCompleted ? "completed" : "unlocked"));
+
+  const goNext = useCallback(() => {
+    setDirection("forward");
+    setCurrentSceneIndex((index) => Math.min(index + 1, Math.max(scenes.length - 1, 0)));
+  }, [scenes.length]);
+
+  const goPrevious = useCallback(() => {
+    setDirection("backward");
+    setCurrentSceneIndex((index) => Math.max(index - 1, 0));
+  }, []);
+
+  const updateScene = useCallback((sceneSlug: string, updater: (scene: JourneyScene) => JourneyScene) => {
+    setScenes((currentScenes) => currentScenes.map((scene) => (scene.slug === sceneSlug ? updater(scene) : scene)));
+  }, []);
+
+  const completeSceneLocally = useCallback(
+    (sceneSlug: string) => {
+      setIsBusy(true);
+      updateScene(sceneSlug, (scene) => ({
+        ...scene,
+        progressIsCompleted: true,
+        completedAt: new Date().toISOString(),
+      }));
+      setLastCompletedSlug(sceneSlug);
+      window.setTimeout(() => setIsBusy(false), 220);
+    },
+    [updateScene],
+  );
+
+  const submitPhotoLocally = useCallback(
+    (sceneSlug: string, file: File, rewardKey?: string | null) => {
+      const mediaUrl = URL.createObjectURL(file);
+      updateScene(sceneSlug, (scene) => ({
+        ...scene,
+        progressIsCompleted: true,
+        completedAt: new Date().toISOString(),
+        taskResponse: buildPreviewTaskResponse("photo", rewardKey, {
+          fileName: file.name,
+          fileSize: file.size,
+          mimeType: file.type,
+          previewOnly: true,
+        }, mediaUrl),
+        rewards: unlockRewardList(scene.rewards, rewardKey),
+      }));
+      setLastCompletedSlug(sceneSlug);
+    },
+    [updateScene],
+  );
+
+  const completeMiniGameLocally = useCallback(
+    ({ sceneSlug, gameKey = "primary", score, rewardKey, payload = {} }: CompleteMiniGameParams & { sceneSlug: string }) => {
+      updateScene(sceneSlug, (scene) => ({
+        ...scene,
+        progressIsCompleted: true,
+        completedAt: new Date().toISOString(),
+        taskResponse: buildPreviewTaskResponse(
+          "mini_game",
+          rewardKey,
+          {
+            ...payload,
+            gameKey,
+            score,
+            previewOnly: true,
+          },
+          null,
+          score,
+        ),
+        rewards: unlockRewardList(scene.rewards, rewardKey),
+      }));
+      setLastCompletedSlug(sceneSlug);
+    },
+    [updateScene],
+  );
+
+  const unlockRewardLocally = useCallback(
+    (sceneSlug: string, rewardKey: string) => {
+      updateScene(sceneSlug, (scene) => ({
+        ...scene,
+        rewards: unlockRewardList(scene.rewards, rewardKey),
+      }));
+    },
+    [updateScene],
+  );
+
+  if (isLoading) {
+    return (
+      <MobileSceneLayout title="Journey Preview" subtitle={summary} backgroundVariant="deep">
+        <PremiumCard className="flex min-h-[18rem] w-full items-center justify-center p-6">
+          <div className="h-2 w-28 overflow-hidden rounded-full bg-white/10">
+            <motion.div
+              className="h-full w-1/2 rounded-full bg-[#d9a7a0]"
+              animate={reduceMotion ? undefined : { x: ["-20%", "120%"] }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: "easeInOut" }}
+            />
+          </div>
+        </PremiumCard>
+      </MobileSceneLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <MobileSceneLayout title="Preview açılamadı" subtitle="Kilitli içerik test endpoint'i hazır değil." backgroundVariant="deep">
+        <PremiumCard className="w-full p-6">
+          <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 text-[#f4dcc0]">
+            <RotateCcw size={21} strokeWidth={1.6} />
+          </div>
+          <p className="text-lg leading-8 text-[#fffaf2]/78">{error}</p>
+          <div className="mt-7">
+            <PrimaryActionButton onClick={() => refreshPreview()} disabled={isLoading}>
+              Tekrar Dene
+              <RotateCcw size={18} strokeWidth={1.7} />
+            </PrimaryActionButton>
+          </div>
+        </PremiumCard>
+      </MobileSceneLayout>
+    );
+  }
+
+  if (!currentScene) {
+    return (
+      <MobileSceneLayout title="Preview boş" subtitle="Aktif sahne bulunamadı." backgroundVariant="deep">
+        <PremiumCard className="w-full p-6">
+          <p className="text-lg leading-8 text-[#fffaf2]/78">Supabase preview RPC sahne döndürmedi.</p>
+        </PremiumCard>
+      </MobileSceneLayout>
+    );
+  }
 
   return (
-    <MobileSceneLayout title="Journey Preview" subtitle={summary} backgroundVariant="deep">
-      <div className="w-full space-y-3 pb-4">
-        <PremiumCard className="w-full p-5">
-          <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 text-[#f4dcc0]">
-            <Eye size={21} strokeWidth={1.7} />
+    <MobileSceneLayout
+      title={currentScene.title}
+      subtitle={currentScene.subtitle ?? summary}
+      previousAction={canNavigatePrevious ? goPrevious : undefined}
+      nextAction={canNavigateNext ? goNext : undefined}
+      progress={{ current: currentSceneIndex + 1, total: scenes.length, states: progressStates }}
+      showSideArrows
+      animationDirection={direction}
+      backgroundVariant={currentScene.backgroundVariant ?? "deep"}
+      primaryAction={getPrimaryAction({
+        scene: currentScene,
+        canGoNext: canNavigateNext,
+        onNext: goNext,
+      })}
+    >
+      <div className="relative w-full">
+        <PremiumCard className="mb-3 w-full p-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 text-[#f4dcc0]">
+              <Eye size={18} strokeWidth={1.7} />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-[#fffaf2]">Preview modu</p>
+              <p className="mt-1 text-xs leading-5 text-[#fffaf2]/56">
+                Bu ekranda tüm sahneler açık ve görev sonuçları sadece local test için işlenir.
+              </p>
+            </div>
           </div>
-          <p className="text-xl font-semibold leading-tight text-[#fffaf2]">Manuel içerik kontrolü</p>
-          <p className="mt-3 text-sm leading-6 text-[#fffaf2]/62">
-            Bu sayfa normal journey kilitlerini değiştirmez; sadece edit/test için aktif Supabase içeriklerini
-            listeler. Ana `/journey` akışı aynı kalır.
-          </p>
         </PremiumCard>
 
-        {state.status === "loading" ? (
-          <PremiumCard className="w-full p-6">
-            <div className="h-2 w-full overflow-hidden rounded-full bg-white/10">
-              <div className="h-full w-1/2 rounded-full bg-[#d9a7a0]" />
-            </div>
-            <p className="mt-4 text-sm text-[#fffaf2]/58">Sahne içerikleri okunuyor.</p>
-          </PremiumCard>
+        {lastCompletedSlug && lastCompletedSlug === currentScene.slug ? (
+          <motion.div
+            initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+            className="mb-3 rounded-full border border-[#f4dcc0]/18 bg-[#f4dcc0]/10 px-4 py-2 text-center text-xs font-medium text-[#f4dcc0]/86"
+          >
+            Preview görevi tamamlandı.
+          </motion.div>
         ) : null}
 
-        {state.status === "error" ? (
-          <PremiumCard className="w-full p-6">
-            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 text-[#f4dcc0]">
-              <Lock size={21} strokeWidth={1.7} />
-            </div>
-            <p className="text-lg leading-8 text-[#fffaf2]/78">{state.error}</p>
-          </PremiumCard>
-        ) : null}
-
-        {state.status === "ready" ? state.bundles.map((bundle) => <PreviewSceneCard key={bundle.scene.slug} bundle={bundle} />) : null}
+        <PreviewSceneContent
+          scene={currentScene}
+          isSubmitting={isBusy}
+          onComplete={() => completeSceneLocally(currentScene.slug)}
+          onSubmitPhoto={(file, rewardKey) => submitPhotoLocally(currentScene.slug, file, rewardKey)}
+          onCompleteMiniGame={(params) => completeMiniGameLocally({ sceneSlug: currentScene.slug, ...params })}
+          onUnlockReward={(rewardKey) => unlockRewardLocally(currentScene.slug, rewardKey)}
+        />
       </div>
     </MobileSceneLayout>
   );
 }
 
-function PreviewSceneCard({ bundle }: { bundle: SceneBundle }) {
-  const { scene, status } = bundle;
-  const isLocked = status?.is_locked ?? scene.is_locked;
-  const isCompleted = Boolean(status?.progress_is_completed);
-
-  return (
-    <PremiumCard className="w-full p-5">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#f4dcc0]/68">
-            {scene.date_label ?? scene.type} · #{scene.sort_order}
-          </p>
-          <h2 className="mt-2 break-words text-xl font-semibold leading-tight text-[#fffaf2]">{scene.title}</h2>
-          <p className="mt-2 break-all text-xs text-[#fffaf2]/42">{scene.slug}</p>
-        </div>
-        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-white/12 bg-white/[0.07] px-3 py-1 text-xs font-medium text-[#fffaf2]/75">
-          {isLocked ? <Lock size={14} strokeWidth={1.8} /> : <Unlock size={14} strokeWidth={1.8} />}
-          {isLocked ? "Kilitli" : isCompleted ? "Tamamlandı" : "Açık"}
-        </span>
-      </div>
-
-      {scene.subtitle ? <p className="text-sm leading-6 text-[#fffaf2]/62">{scene.subtitle}</p> : null}
-      {scene.content ? <p className="mt-4 text-base leading-7 text-[#fffaf2]/78">{scene.content}</p> : null}
-      {scene.unlock_condition ? (
-        <p className="mt-4 rounded-[8px] border border-[#f4dcc0]/14 bg-[#f4dcc0]/8 p-3 text-sm leading-6 text-[#f4dcc0]/76">
-          {scene.unlock_condition}
-        </p>
-      ) : null}
-
-      <MediaLinks imageUrl={scene.image_url} videoUrl={scene.video_url} />
-
-      {bundle.blocks.length > 0 ? (
-        <PreviewSection title="Content Blocks" icon={<Sparkles size={16} strokeWidth={1.7} />}>
-          {bundle.blocks.map((block) => (
-            <div key={block.id} className="rounded-[8px] border border-white/10 bg-white/[0.045] p-3">
-              <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#f4dcc0]/68">
-                {block.block_type}
-              </p>
-              {block.title ? <p className="mt-2 text-sm font-semibold text-[#fffaf2]">{block.title}</p> : null}
-              {block.body ? <p className="mt-2 text-sm leading-6 text-[#fffaf2]/64">{block.body}</p> : null}
-              <MediaLinks imageUrl={block.media_url} videoUrl={null} />
-              <JsonPreview value={block.metadata} />
-            </div>
-          ))}
-        </PreviewSection>
-      ) : null}
-
-      {bundle.games.length > 0 ? (
-        <PreviewSection title="Mini Games" icon={<Gamepad2 size={16} strokeWidth={1.7} />}>
-          {bundle.games.map((game) => (
-            <div key={game.id} className="rounded-[8px] border border-white/10 bg-white/[0.045] p-3">
-              <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#f4dcc0]/68">
-                {game.game_type} · {game.game_key}
-              </p>
-              <p className="mt-2 text-sm font-semibold text-[#fffaf2]">{game.title}</p>
-              {game.instructions ? <p className="mt-2 text-sm leading-6 text-[#fffaf2]/64">{game.instructions}</p> : null}
-              {game.reward_key ? <p className="mt-2 text-xs text-[#f4dcc0]/72">Reward: {game.reward_key}</p> : null}
-              <JsonPreview value={game.config} />
-            </div>
-          ))}
-        </PreviewSection>
-      ) : null}
-
-      {bundle.rewards.length > 0 ? (
-        <PreviewSection title="Rewards" icon={<Gift size={16} strokeWidth={1.7} />}>
-          {bundle.rewards.map((reward) => (
-            <div key={reward.id} className="rounded-[8px] border border-white/10 bg-white/[0.045] p-3">
-              <p className="text-xs font-medium uppercase tracking-[0.16em] text-[#f4dcc0]/68">
-                {reward.reward_key}
-              </p>
-              <p className="mt-2 text-sm font-semibold text-[#fffaf2]">{reward.title}</p>
-              {reward.subtitle ? <p className="mt-1 text-sm text-[#fffaf2]/58">{reward.subtitle}</p> : null}
-              {reward.body ? <p className="mt-2 text-sm leading-6 text-[#fffaf2]/64">{reward.body}</p> : null}
-              <MediaLinks imageUrl={reward.image_url} videoUrl={reward.video_url} />
-              <JsonPreview value={reward.metadata} />
-            </div>
-          ))}
-        </PreviewSection>
-      ) : null}
-    </PremiumCard>
-  );
-}
-
-function PreviewSection({
-  title,
-  icon,
-  children,
+function PreviewSceneContent({
+  scene,
+  isSubmitting,
+  onComplete,
+  onSubmitPhoto,
+  onCompleteMiniGame,
+  onUnlockReward,
 }: {
-  title: string;
-  icon: ReactNode;
-  children: ReactNode;
+  scene: JourneyScene;
+  isSubmitting: boolean;
+  onComplete: () => void;
+  onSubmitPhoto: (file: File, rewardKey?: string | null) => void;
+  onCompleteMiniGame: (params: CompleteMiniGameParams) => void;
+  onUnlockReward: (rewardKey: string) => void;
 }) {
-  return (
-    <div className="mt-5">
-      <div className="mb-3 flex items-center gap-2 text-sm font-medium text-[#f4dcc0]/78">
-        {icon}
-        {title}
-      </div>
-      <div className="grid gap-3">{children}</div>
-    </div>
-  );
-}
+  if (scene.type === "task") {
+    if (scene.miniGame) {
+      return (
+        <TaskExperience>
+          <MiniGameCard scene={scene} isSubmitting={isSubmitting} onComplete={onCompleteMiniGame} />
+          <RewardRevealStack rewards={scene.rewards} isBusy={isSubmitting} onUnlock={onUnlockReward} />
+        </TaskExperience>
+      );
+    }
 
-function MediaLinks({ imageUrl, videoUrl }: { imageUrl: string | null; videoUrl: string | null }) {
-  if (!imageUrl && !videoUrl) return null;
+    if (scene.contentBlocks.some((block) => block.type === "photo_task") || scene.taskResponse?.type === "photo") {
+      return (
+        <TaskExperience>
+          <PhotoTaskCard scene={scene} isSubmitting={isSubmitting} onSubmit={onSubmitPhoto} />
+          <RewardRevealStack rewards={scene.rewards} isBusy={isSubmitting} onUnlock={onUnlockReward} />
+        </TaskExperience>
+      );
+    }
 
-  return (
-    <div className="mt-3 grid gap-2 text-xs leading-5 text-[#fffaf2]/54">
-      {imageUrl ? (
-        <a className="break-all text-[#f4dcc0]/78 underline decoration-[#f4dcc0]/30" href={imageUrl}>
-          Image: {imageUrl}
-        </a>
-      ) : null}
-      {videoUrl ? (
-        <a className="break-all text-[#f4dcc0]/78 underline decoration-[#f4dcc0]/30" href={videoUrl}>
-          Video: {videoUrl}
-        </a>
-      ) : null}
-    </div>
-  );
-}
-
-function JsonPreview({ value }: { value: Record<string, unknown> }) {
-  if (Object.keys(value).length === 0) return null;
-
-  return (
-    <pre className="mt-3 max-h-56 overflow-auto rounded-[8px] border border-white/10 bg-black/20 p-3 text-[0.7rem] leading-5 text-[#fffaf2]/58 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      {JSON.stringify(value, null, 2)}
-    </pre>
-  );
-}
-
-async function getPreviewBundles({
-  supabaseUrl,
-  supabaseKey,
-  code,
-}: {
-  supabaseUrl: string;
-  supabaseKey: string;
-  code: string;
-}): Promise<{ ok: true; bundles: SceneBundle[] } | { ok: false; error: string }> {
-  const [scenesResult, blocksResult, gamesResult, rewardsResult, statusResult] = await Promise.all([
-    supabaseRest<PreviewScene[]>(
-      supabaseUrl,
-      supabaseKey,
-      "/journey_scenes?select=id,slug,type,title,subtitle,content,image_url,video_url,date_label,sort_order,background_variant,is_locked,unlock_condition&is_active=eq.true&order=sort_order.asc",
-    ),
-    supabaseRest<PreviewBlock[]>(supabaseUrl, supabaseKey, "/journey_scene_content_blocks?select=*&is_active=eq.true&order=sort_order.asc"),
-    supabaseRest<PreviewMiniGame[]>(supabaseUrl, supabaseKey, "/journey_mini_games?select=*&is_active=eq.true&order=sort_order.asc"),
-    supabaseRest<PreviewReward[]>(supabaseUrl, supabaseKey, "/journey_rewards?select=*&is_active=eq.true&order=sort_order.asc"),
-    supabaseRpc<RpcSceneStatus[]>(supabaseUrl, supabaseKey, "/get_journey_scenes", { p_code: code }),
-  ]);
-
-  const firstError = [scenesResult, blocksResult, gamesResult, rewardsResult, statusResult].find((item) => !item.ok);
-  if (firstError && !firstError.ok) {
-    return { ok: false, error: firstError.error };
+    return (
+      <TaskExperience>
+        <TaskCard
+          title={scene.content ?? scene.title}
+          isCompleted={scene.progressIsCompleted}
+          isSubmitting={isSubmitting}
+          onComplete={onComplete}
+        />
+        <RewardRevealStack rewards={scene.rewards} isBusy={isSubmitting} onUnlock={onUnlockReward} />
+      </TaskExperience>
+    );
   }
 
-  const scenes = scenesResult.ok ? scenesResult.data : [];
-  const blocks = groupByScene(blocksResult.ok ? blocksResult.data : []);
-  const games = groupByScene(gamesResult.ok ? gamesResult.data : []);
-  const rewards = groupByScene(rewardsResult.ok ? rewardsResult.data : []);
-  const statusBySlug = new Map((statusResult.ok ? statusResult.data : []).map((item) => [item.slug, item]));
+  if (scene.type === "memory") {
+    return (
+      <div className="w-full space-y-3">
+        <MemoryCard imageUrl={scene.imageUrl} dateLabel={scene.dateLabel} title={scene.title} content={scene.content} />
+        <JourneyContentBlocks blocks={scene.contentBlocks} />
+      </div>
+    );
+  }
 
+  const icon = scene.type === "welcome" ? Sparkles : scene.slug.includes("anniversary") ? Heart : Gift;
+
+  return (
+    <div className="w-full space-y-3">
+      <PremiumCard className="w-full p-6">
+        <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 text-[#f4dcc0]">
+          {icon === Heart ? <Heart size={21} strokeWidth={1.6} /> : icon === Gift ? <Gift size={21} strokeWidth={1.6} /> : <Sparkles size={21} strokeWidth={1.6} />}
+        </div>
+        {scene.dateLabel ? (
+          <p className="mb-3 text-xs font-medium uppercase tracking-[0.18em] text-[#f4dcc0]/78">{scene.dateLabel}</p>
+        ) : null}
+        <p className="text-2xl font-semibold leading-tight text-[#fffaf2]">{scene.content}</p>
+        {scene.progressIsCompleted ? (
+          <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 px-3 py-2 text-sm text-[#f4dcc0]">
+            <Check size={16} strokeWidth={1.8} />
+            Tamamlandı
+          </div>
+        ) : null}
+      </PremiumCard>
+      <JourneyContentBlocks blocks={scene.contentBlocks} />
+    </div>
+  );
+}
+
+function getPrimaryAction({
+  scene,
+  canGoNext,
+  onNext,
+}: {
+  scene: JourneyScene;
+  canGoNext: boolean;
+  onNext: () => void;
+}) {
+  if (scene.type === "task" && !scene.progressIsCompleted) {
+    return undefined;
+  }
+
+  if (canGoNext) {
+    return { label: scene.primaryActionLabel ?? "Devam Et", onClick: onNext };
+  }
+
+  return undefined;
+}
+
+function resetForPreview(scene: JourneyScene): JourneyScene {
   return {
-    ok: true,
-    bundles: scenes.map((scene) => ({
-      scene,
-      blocks: blocks.get(scene.slug) ?? [],
-      games: games.get(scene.slug) ?? [],
-      rewards: rewards.get(scene.slug) ?? [],
-      status: statusBySlug.get(scene.slug),
+    ...scene,
+    isLocked: false,
+    progressIsUnlocked: true,
+    progressIsCompleted: false,
+    completedAt: null,
+    taskResponse: null,
+    rewards: scene.rewards.map((reward) => ({
+      ...reward,
+      isUnlocked: false,
+      unlockedAt: null,
     })),
   };
 }
 
-async function supabaseRest<T>(
-  supabaseUrl: string,
-  supabaseKey: string,
-  path: string,
-): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
-  return supabaseFetch<T>(supabaseUrl, supabaseKey, path, { method: "GET" });
-}
-
-async function supabaseRpc<T>(
-  supabaseUrl: string,
-  supabaseKey: string,
-  functionPath: string,
-  body: Record<string, unknown>,
-): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
-  return supabaseFetch<T>(supabaseUrl, supabaseKey, `/rpc${functionPath}`, {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
-async function supabaseFetch<T>(
-  supabaseUrl: string,
-  supabaseKey: string,
-  path: string,
-  init: RequestInit,
-): Promise<{ ok: true; data: T } | { ok: false; error: string }> {
-  const response = await fetch(`${supabaseUrl}/rest/v1${path}`, {
-    ...init,
-    headers: {
-      apikey: supabaseKey,
-      Authorization: `Bearer ${supabaseKey}`,
-      "Content-Type": "application/json",
-      Prefer: "return=representation",
-      ...(init.headers ?? {}),
-    },
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    return { ok: false, error: text || `Supabase REST hata kodu: ${response.status}` };
+function unlockRewardList(rewards: JourneyReward[], rewardKey?: string | null) {
+  if (!rewardKey) {
+    return rewards;
   }
 
-  return { ok: true, data: (await response.json()) as T };
+  return rewards.map((reward) =>
+    reward.rewardKey === rewardKey
+      ? {
+          ...reward,
+          isUnlocked: true,
+          unlockedAt: new Date().toISOString(),
+        }
+      : reward,
+  );
 }
 
-function groupByScene<T extends { scene_slug: string }>(items: T[]) {
-  const grouped = new Map<string, T[]>();
+function buildPreviewTaskResponse(
+  type: JourneyTaskResponse["type"],
+  rewardKey: string | null | undefined,
+  payload: Record<string, unknown>,
+  mediaUrl: string | null,
+  score?: number | null,
+): JourneyTaskResponse {
+  const completedAt = new Date().toISOString();
 
-  for (const item of items) {
-    const next = grouped.get(item.scene_slug) ?? [];
-    next.push(item);
-    grouped.set(item.scene_slug, next);
+  return {
+    id: `preview-${crypto.randomUUID()}`,
+    responseKey: "primary",
+    type,
+    status: "completed",
+    mediaUrl,
+    score: score ?? null,
+    rewardKey,
+    payload,
+    completedAt,
+    updatedAt: completedAt,
+  };
+}
+
+function findFirstPlayableIndex(scenes: JourneyScene[]) {
+  const firstMiniGameIndex = scenes.findIndex((scene) => scene.miniGame);
+  if (firstMiniGameIndex >= 0) {
+    return firstMiniGameIndex;
   }
 
-  return grouped;
+  const firstTaskIndex = scenes.findIndex((scene) => scene.type === "task");
+  return firstTaskIndex >= 0 ? firstTaskIndex : 0;
+}
+
+function TaskExperience({ children }: { children: ReactNode }) {
+  return <div className="w-full space-y-3">{children}</div>;
+}
+
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  return "Preview su an acilamadi. Birazdan yeniden deneyelim.";
 }

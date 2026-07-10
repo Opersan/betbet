@@ -45,6 +45,34 @@ export async function getJourneyScenes(code = DEFAULT_JOURNEY_ACCESS_CODE): Prom
   return (data as JourneySceneRow[]).map(mapSceneRow).sort((first, second) => first.sortOrder - second.sortOrder);
 }
 
+export async function getJourneyPreviewScenes({
+  code = DEFAULT_JOURNEY_ACCESS_CODE,
+  previewToken,
+}: {
+  code?: string;
+  previewToken: string;
+}): Promise<JourneyScene[]> {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) {
+    throw new Error("Supabase istemcisi hazir degil.");
+  }
+
+  const { data, error } = await supabase.rpc("get_journey_preview_scenes", {
+    p_code: code,
+    p_preview_token: previewToken,
+  });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return (data as JourneySceneRow[]).map(mapSceneRow).sort((first, second) => first.sortOrder - second.sortOrder);
+}
+
 export async function completeJourneyScene({
   code = DEFAULT_JOURNEY_ACCESS_CODE,
   sceneSlug,
