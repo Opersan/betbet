@@ -14,6 +14,7 @@ import { MiniGameCard } from "@/components/ui/MiniGameCard";
 import { PhotoTaskCard } from "@/components/ui/PhotoTaskCard";
 import { RewardRevealStack } from "@/components/ui/RewardRevealStack";
 import { useJourneyScenes } from "@/hooks/useJourneyScenes";
+import { startEmotionalSoundtrack } from "@/lib/audio/emotionalSoundtrack";
 import type { JourneyScene } from "@/lib/journey/types";
 
 export default function JourneyPage() {
@@ -104,13 +105,17 @@ export default function JourneyPage() {
     if (scene.isLocked) return "locked";
     return "unlocked";
   });
+  const handleNext = () => {
+    startEmotionalSoundtrack();
+    goNext();
+  };
 
   return (
     <MobileSceneLayout
       title={currentScene.title}
       subtitle={currentScene.subtitle ?? undefined}
       previousAction={canNavigatePrevious ? goPrevious : undefined}
-      nextAction={canNavigateNext ? goNext : undefined}
+      nextAction={canNavigateNext ? handleNext : undefined}
       progress={{ current: currentSceneIndex + 1, total: scenes.length, states: progressStates }}
       showSideArrows
       isLocked={currentScene.isLocked}
@@ -119,7 +124,7 @@ export default function JourneyPage() {
       primaryAction={getPrimaryAction({
         scene: currentScene,
         canGoNext: canNavigateNext,
-        onNext: goNext,
+        onNext: handleNext,
       })}
     >
       <div className="relative w-full">

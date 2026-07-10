@@ -6,6 +6,7 @@ import { ArrowRight, LockKeyhole } from "lucide-react";
 import { MobileSceneLayout } from "@/components/layout/MobileSceneLayout";
 import { PremiumCard } from "@/components/ui/PremiumCard";
 import { PrimaryActionButton } from "@/components/ui/PrimaryActionButton";
+import { startEmotionalSoundtrack } from "@/lib/audio/emotionalSoundtrack";
 import { DEFAULT_JOURNEY_ACCESS_CODE, validateAccessCode } from "@/lib/journey/queries";
 import { JOURNEY_ACCESS_CODE_KEY, JOURNEY_LAST_LOADED_AT_KEY } from "@/hooks/useJourneyScenes";
 
@@ -24,6 +25,7 @@ export default function UnlockPage() {
       return;
     }
 
+    startEmotionalSoundtrack();
     setIsLoading(true);
     setError(null);
 

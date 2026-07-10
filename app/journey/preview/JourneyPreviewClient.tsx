@@ -12,6 +12,7 @@ import { PremiumCard } from "@/components/ui/PremiumCard";
 import { PrimaryActionButton } from "@/components/ui/PrimaryActionButton";
 import { RewardRevealStack } from "@/components/ui/RewardRevealStack";
 import { TaskCard } from "@/components/ui/TaskCard";
+import { startEmotionalSoundtrack } from "@/lib/audio/emotionalSoundtrack";
 import { getJourneyPreviewScenes } from "@/lib/journey/queries";
 import type { JourneyReward, JourneyScene, JourneyTaskResponse } from "@/lib/journey/types";
 
@@ -104,6 +105,7 @@ export function JourneyPreviewClient({
   const progressStates = scenes.map((scene) => (scene.progressIsCompleted ? "completed" : "unlocked"));
 
   const goNext = useCallback(() => {
+    startEmotionalSoundtrack();
     setDirection("forward");
     setCurrentSceneIndex((index) => Math.min(index + 1, Math.max(scenes.length - 1, 0)));
   }, [scenes.length]);
