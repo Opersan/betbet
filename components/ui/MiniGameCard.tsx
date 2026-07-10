@@ -102,6 +102,7 @@ function ReactionDuelGame({
   const reduceMotion = useReducedMotion();
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const startedAtRef = useRef<number>(0);
+  const roundSettledRef = useRef(false);
   const players = useMemo(() => getPlayers(game), [game]);
   const penalties = useMemo(() => getPenalties(game), [game]);
   const [state, setState] = useState<"idle" | "waiting" | "live" | "result">("idle");
@@ -118,6 +119,7 @@ function ReactionDuelGame({
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     setResult(null);
     setSubmitted(false);
+    roundSettledRef.current = false;
     setState("waiting");
 
     const minDelay = getNumberConfig(game, "waitMinMs", 1200);
@@ -131,9 +133,10 @@ function ReactionDuelGame({
   }
 
   function handlePlayerTap(player: Player, timestamp: number) {
-    if (state === "result" || submitted || isCompleted) return;
+    if (state === "result" || submitted || isCompleted || roundSettledRef.current) return;
 
     if (state === "waiting") {
+      roundSettledRef.current = true;
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       const winner = players.find((item) => item.id !== player.id) ?? players[0];
       finishRound(winner, player, "Işık yanmadan dokundu.");
@@ -141,6 +144,7 @@ function ReactionDuelGame({
     }
 
     if (state === "live") {
+      roundSettledRef.current = true;
       const loser = players.find((item) => item.id !== player.id) ?? players[1] ?? players[0];
       const reactionMs = Math.round(timestamp - startedAtRef.current);
       finishRound(player, loser, `${reactionMs} ms`);
@@ -260,14 +264,23 @@ function DuelTapZone({
   return (
     <button
       className={cn(
-        "min-h-24 rounded-[8px] border border-white/12 bg-white/[0.07] px-4 py-5 text-center transition active:translate-y-px",
+        "min-h-24 touch-none select-none rounded-[8px] border border-white/12 bg-white/[0.07] px-4 py-5 text-center transition active:translate-y-px [-webkit-tap-highlight-color:transparent]",
         state === "live" && "border-[#f4dcc0]/42 bg-[#f4dcc0]/14 shadow-[0_18px_55px_rgba(244,220,192,0.12)]",
         position === "top" && "origin-bottom",
         position === "bottom" && "origin-top",
       )}
       type="button"
       disabled={state === "idle" || state === "result"}
-      onClick={(event) => onTap(player, event.timeStamp)}
+      onPointerDown={(event) => {
+        if (event.pointerType === "mouse" && event.button !== 0) return;
+        event.preventDefault();
+        onTap(player, performance.now());
+      }}
+      onKeyDown={(event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        onTap(player, performance.now());
+      }}
     >
       <p className="text-xs font-medium uppercase tracking-[0.18em] text-[#f4dcc0]/72">{position === "top" ? "Üst taraf" : "Alt taraf"}</p>
       <p className="mt-2 text-xl font-semibold text-[#fffaf2]">{player.label}</p>
