@@ -24,10 +24,10 @@ type CompleteMiniGameParams = {
 
 export function JourneyPreviewClient({
   code,
-  previewToken,
+  rpcPreviewToken,
 }: {
   code: string;
-  previewToken: string;
+  rpcPreviewToken: string;
 }) {
   const reduceMotion = useReducedMotion();
   const [scenes, setScenes] = useState<JourneyScene[]>([]);
@@ -46,7 +46,7 @@ export function JourneyPreviewClient({
       setError(null);
 
       try {
-        const nextScenes = await getJourneyPreviewScenes({ code, previewToken });
+        const nextScenes = await getJourneyPreviewScenes({ code, previewToken: rpcPreviewToken });
         const normalizedScenes = nextScenes.map(resetForPreview);
         setScenes(normalizedScenes);
 
@@ -60,7 +60,7 @@ export function JourneyPreviewClient({
         setIsLoading(false);
       }
     },
-    [code, previewToken],
+    [code, rpcPreviewToken],
   );
 
   useEffect(() => {
@@ -68,7 +68,7 @@ export function JourneyPreviewClient({
 
     async function loadInitialPreview() {
       try {
-        const nextScenes = await getJourneyPreviewScenes({ code, previewToken });
+        const nextScenes = await getJourneyPreviewScenes({ code, previewToken: rpcPreviewToken });
         if (!isMounted) return;
 
         const normalizedScenes = nextScenes.map(resetForPreview);
@@ -90,7 +90,7 @@ export function JourneyPreviewClient({
     return () => {
       isMounted = false;
     };
-  }, [code, previewToken]);
+  }, [code, rpcPreviewToken]);
 
   const summary = useMemo(() => {
     const gameCount = scenes.filter((scene) => scene.miniGame).length;

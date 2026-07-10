@@ -12,7 +12,7 @@ export default async function JourneyPreviewPage({ searchParams }: { searchParam
   const token = firstParam(params.token);
   const code = firstParam(params.code) ?? "20TEMMUZ";
   const access = getPreviewAccess(token);
-  const previewToken = token ?? `${code}-PREVIEW`;
+  const rpcPreviewToken = `${code}-PREVIEW`;
 
   if (!access.allowed) {
     return (
@@ -35,7 +35,7 @@ export default async function JourneyPreviewPage({ searchParams }: { searchParam
     );
   }
 
-  return <JourneyPreviewClient code={code} previewToken={previewToken} />;
+  return <JourneyPreviewClient code={code} rpcPreviewToken={rpcPreviewToken} />;
 }
 
 function firstParam(value: string | string[] | undefined) {
