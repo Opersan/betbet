@@ -264,9 +264,9 @@ export function JourneyPreviewClient({
 
         {lastCompletedSlug && lastCompletedSlug === currentScene.slug ? (
           <motion.div
-            initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+            initial={reduceMotion ? false : { opacity: 0, y: 10, scale: 0.985 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.68, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
             className="mb-3 rounded-full border border-[#f4dcc0]/18 bg-[#f4dcc0]/10 px-4 py-2 text-center text-xs font-medium text-[#f4dcc0]/86"
           >
             Preview görevi tamamlandı.

@@ -108,9 +108,9 @@ export function PhotoTaskCard({
       <div className="mt-6 overflow-hidden rounded-[8px] border border-white/10 bg-white/[0.045]">
         {imageUrl ? (
           <motion.div
-            initial={reduceMotion ? false : { opacity: 0, scale: 0.98 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+            initial={reduceMotion ? false : { opacity: 0, scale: 0.975, filter: "blur(8px)" }}
+            animate={{ opacity: 1, scale: 1, filter: "blur(0px)" }}
+            transition={{ duration: 0.74, ease: [0.16, 1, 0.3, 1] }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img className="aspect-[4/5] w-full object-cover" src={imageUrl} alt="Görev fotoğrafı" />

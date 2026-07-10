@@ -29,9 +29,9 @@ export function TaskCard({
       <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 text-[#f4dcc0]">
         <motion.span
           key={isCompleted ? "completed" : "waiting"}
-          initial={reduceMotion ? false : { opacity: 0, scale: 0.82, rotate: isCompleted ? -8 : 0 }}
-          animate={{ opacity: 1, scale: 1, rotate: 0 }}
-          transition={{ duration: 0.42, ease: [0.16, 1, 0.3, 1] }}
+          initial={reduceMotion ? false : { opacity: 0, y: 2, scale: 0.78, rotate: isCompleted ? -10 : 0 }}
+          animate={{ opacity: 1, y: 0, scale: 1, rotate: 0 }}
+          transition={{ duration: 0.68, ease: [0.16, 1, 0.3, 1] }}
           className="inline-flex"
         >
           {isCompleted ? <Check size={21} strokeWidth={1.8} /> : <HeartHandshake size={21} strokeWidth={1.6} />}

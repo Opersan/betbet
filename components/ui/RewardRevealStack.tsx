@@ -70,9 +70,9 @@ function RewardCard({
             <Sparkles size={19} strokeWidth={1.6} />
           </div>
           <motion.div
-            initial={reduceMotion ? false : { opacity: 0, scale: 0.86 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            initial={reduceMotion ? false : { opacity: 0, y: 4, scale: 0.88 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.68, delay: 0.16, ease: [0.16, 1, 0.3, 1] }}
             className="rounded-full border border-[#f4dcc0]/18 bg-[#f4dcc0]/10 px-3 py-1 text-xs font-medium text-[#f4dcc0]/88"
           >
             Açıldı

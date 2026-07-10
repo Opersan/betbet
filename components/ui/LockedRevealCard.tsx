@@ -46,9 +46,9 @@ export function LockedRevealCard({
             </div>
           </div>
           <motion.p
-            initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+            initial={reduceMotion ? false : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.48, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ duration: 0.7, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
             className="mt-5 text-sm leading-6 text-[#f4dcc0]/72"
           >
             {unlockCondition ?? "Açılacağı ana kadar bu bölüm kapalı kalacak."}
