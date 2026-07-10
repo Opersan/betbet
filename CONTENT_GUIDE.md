@@ -4,6 +4,8 @@ This project uses Supabase as the source of truth for the romantic journey. The 
 
 For manual testing, use `/journey/preview` locally or `/journey/preview?token=20TEMMUZ2` in production after setting `JOURNEY_PREVIEW_TOKEN=20TEMMUZ2` or any other private value. This preview page uses `get_journey_preview_scenes` so all active scenes are visible and playable without changing the public `/journey` lock flow. The URL token is only the page gate; the RPC preview token is derived internally from the access code. Task completions in preview are local-only and reset on refresh.
 
+For temporary desktop content editing, set `NEXT_PUBLIC_CONTENT_STUDIO_ENABLED=true` and open `/content-studio`. This route is not linked from the public journey. It uses the existing journey tables through `get_content_studio_data` and `content_studio_mutation` RPCs.
+
 ## Supabase Changes Applied
 
 The following objects were created directly in Supabase through MCP:
@@ -17,6 +19,9 @@ The following objects were created directly in Supabase through MCP:
 - Storage bucket `journey-task-uploads` for private photo task uploads
 - RPC `save_journey_task_response(...)`
 - RPC `claim_journey_reward(...)`
+- RPC `get_content_studio_data(...)`
+- RPC `content_studio_mutation(...)`
+- Storage policies for `journey-content` uploads from Content Studio
 - Extended RPC `get_journey_scenes(p_code text)` with optional JSON fields:
   - `content_blocks`
   - `task_response`
