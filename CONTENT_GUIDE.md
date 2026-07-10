@@ -2,6 +2,8 @@
 
 This project uses Supabase as the source of truth for the romantic journey. The frontend reads the main flow through `get_journey_scenes('20TEMMUZ')` and does not query `journey_scenes` directly.
 
+For manual content review, use `/journey/preview` locally or `/journey/preview?token=YOUR_TOKEN` in production after setting `JOURNEY_PREVIEW_TOKEN`. This preview page reads active Supabase content tables directly on the server so locked scene content, rewards, content blocks, and mini game config can be inspected without changing the public journey flow.
+
 ## Supabase Changes Applied
 
 The following objects were created directly in Supabase through MCP:
