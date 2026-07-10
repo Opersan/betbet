@@ -80,14 +80,64 @@ Create a row in `journey_mini_games` for a task scene.
 Current frontend support:
 
 - `tap_sequence`
+- `reaction_duel`
+- `couple_quiz`
+- `penalty_picker`
 
-Example config:
+`tap_sequence` example config:
 
 ```json
 {
   "sequence": ["rose", "champagne", "deep"],
   "labels": ["Gül", "Işık", "Gece"],
   "successScore": 3
+}
+```
+
+`reaction_duel` is a same-phone couple game. Put the phone between both players, wait for the light, and the first valid tap wins. Early tap is a foul.
+
+```json
+{
+  "players": ["Sen", "Ben"],
+  "readyText": "Telefon ortada. Parmaklar hazır, ama ışık yanmadan dokunmak yok.",
+  "liveText": "Şimdi! İlk dokunan kazanır.",
+  "waitMinMs": 1200,
+  "waitMaxMs": 3200,
+  "penalties": [
+    "Kaybeden bir shot içer.",
+    "Kaybeden bir yudum su içer ve kazanana güzel bir iltifat eder.",
+    "Kaybeden bugünün en sevdiği anını anlatır."
+  ],
+  "alcoholNote": "Shot cezası sadece ikiniz de istiyorsanız; yerine su, iltifat veya küçük görev seçilebilir."
+}
+```
+
+`couple_quiz` is a pass-and-play quiz for two people on the same phone.
+
+```json
+{
+  "players": ["Sen", "Ben"],
+  "questions": [
+    {
+      "prompt": "İlk birlikte planımız en çok neye benziyordu?",
+      "options": ["Gece yürüyüşü", "Erken uyumak", "Sessiz kalmak"],
+      "correctIndex": 0
+    }
+  ],
+  "penalties": ["Kaybeden kazanana bir iltifat eder."]
+}
+```
+
+`penalty_picker` is a two-card game. One player picks a card; the result decides who receives the configured penalty.
+
+```json
+{
+  "players": ["Sen", "Ben"],
+  "penalties": [
+    "Kaybeden bir shot içer.",
+    "Kaybeden kazananın seçeceği şarkının nakaratını söyler."
+  ],
+  "alcoholNote": "Alkol tamamen opsiyoneldir; config içinde alkolsüz alternatifler de tutulabilir."
 }
 ```
 
@@ -114,6 +164,6 @@ The following example rows were added:
 
 - `fri-01-welcome`: one text content block
 - `fri-task-01-heart-stamp`: one `photo_task` block and `photo-memory` reward
-- `sat-task-01-morning-proof`: one `tap_sequence` mini game and `morning-proof-reward`
+- `sat-task-01-morning-proof`: one `reaction_duel` same-phone mini game and `morning-proof-reward`
 
 Locked scenes still hide `content_blocks`, `mini_game`, `task_response`, and reward content through `get_journey_scenes`.
