@@ -61,27 +61,68 @@ export async function getTaskUploadSignedUrl(bucket: string, path: string) {
   return data.signedUrl;
 }
 
+export async function removeTaskUploadFiles(files: Array<{ bucket: string; path: string }>) {
+  const supabase = getSupabaseBrowserClient();
+  if (!supabase) throw new Error("Supabase istemcisi hazır değil.");
+
+  const filesByBucket = new Map<string, string[]>();
+  files.forEach(({ bucket, path }) => {
+    const paths = filesByBucket.get(bucket) ?? [];
+    paths.push(path);
+    filesByBucket.set(bucket, paths);
+  });
+
+  for (const [bucket, paths] of filesByBucket) {
+    const { error } = await supabase.storage.from(bucket).remove(paths);
+    if (error) throw new Error(error.message);
+  }
+}
+
 function normalizeStudioData(value: unknown): ContentStudioData {
   const data = isRecord(value) ? value : {};
+  const scenes = arrayValue(data.scenes, "scenes");
+  const contentBlocks = arrayValue(data.contentBlocks, "contentBlocks");
+  const miniGames = arrayValue(data.miniGames, "miniGames");
+
+  assertSupportedRecordValues(scenes, "type", ["welcome", "story", "task", "memory", "locked", "final", "chapter"], "sahne tipi");
+  assertSupportedRecordValues(contentBlocks, "block_type", ["text", "quote", "image", "video", "audio", "divider", "prompt", "reward", "game", "photo_task"], "içerik blok tipi");
+  assertSupportedRecordValues(miniGames, "game_type", ["memory_match", "tap_sequence", "scratch_reveal", "choice", "reaction_duel", "couple_quiz", "penalty_picker"], "mini oyun tipi");
 
   return {
-    scenes: arrayValue(data.scenes),
-    accessCodes: arrayValue(data.accessCodes),
-    progress: arrayValue(data.progress),
-    unlockRules: arrayValue(data.unlockRules),
-    unlockSchedule: arrayValue(data.unlockSchedule),
-    dependencies: arrayValue(data.dependencies),
-    mediaRequirements: arrayValue(data.mediaRequirements),
-    contentBlocks: arrayValue(data.contentBlocks),
-    taskResponses: arrayValue(data.taskResponses),
-    miniGames: arrayValue(data.miniGames),
-    rewards: arrayValue(data.rewards),
-    rewardClaims: arrayValue(data.rewardClaims),
+    scenes,
+    accessCodes: arrayValue(data.accessCodes, "accessCodes"),
+    progress: arrayValue(data.progress, "progress"),
+    unlockRules: arrayValue(data.unlockRules, "unlockRules"),
+    unlockSchedule: arrayValue(data.unlockSchedule, "unlockSchedule"),
+    dependencies: arrayValue(data.dependencies, "dependencies"),
+    mediaRequirements: arrayValue(data.mediaRequirements, "mediaRequirements"),
+    contentBlocks,
+    taskResponses: arrayValue(data.taskResponses, "taskResponses"),
+    miniGames,
+    rewards: arrayValue(data.rewards, "rewards"),
+    rewardClaims: arrayValue(data.rewardClaims, "rewardClaims"),
   } as ContentStudioData;
 }
 
-function arrayValue(value: unknown) {
-  return Array.isArray(value) ? value : [];
+function arrayValue(value: unknown, key: string) {
+  if (value === undefined || value === null) return [];
+  if (Array.isArray(value)) return value;
+  throw new Error(`Content Studio ${key} alanı liste biçiminde değil.`);
+}
+
+function assertSupportedRecordValues(
+  rows: unknown[],
+  key: string,
+  allowed: readonly string[],
+  label: string,
+) {
+  rows.forEach((row, index) => {
+    const record = isRecord(row) ? row : null;
+    const fieldValue = record?.[key];
+    if (!record || typeof fieldValue !== "string" || !allowed.includes(fieldValue)) {
+      throw new Error(`Content Studio ${index + 1}. satırında desteklenmeyen ${label}: ${String(fieldValue ?? "eksik")}`);
+    }
+  });
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

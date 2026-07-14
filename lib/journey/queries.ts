@@ -39,7 +39,7 @@ export async function getJourneyScenes(code = DEFAULT_JOURNEY_ACCESS_CODE): Prom
   }
 
   if (!Array.isArray(data)) {
-    return [];
+    throw new Error("Journey sahne yanıtı beklenen liste biçiminde değil.");
   }
 
   return (data as JourneySceneRow[]).map(mapSceneRow).sort((first, second) => first.sortOrder - second.sortOrder);
@@ -67,7 +67,7 @@ export async function getJourneyPreviewScenes({
   }
 
   if (!Array.isArray(data)) {
-    return [];
+    throw new Error("Journey preview yanıtı beklenen liste biçiminde değil.");
   }
 
   return (data as JourneySceneRow[]).map(mapSceneRow).sort((first, second) => first.sortOrder - second.sortOrder);
@@ -285,7 +285,8 @@ function mapSceneRow(row: JourneySceneRow): JourneyScene {
 }
 
 function normalizeSceneType(type: SceneType | undefined): SceneType {
-  return type ?? "story";
+  const supportedTypes: SceneType[] = ["welcome", "story", "task", "memory", "locked", "final", "chapter"];
+  return requireSupportedValue(type, supportedTypes, "sahne tipi");
 }
 
 function mapContentBlocks(value: unknown): JourneyContentBlock[] {
@@ -378,22 +379,30 @@ function toNumber(value: unknown, fallback: number) {
 
 function normalizeContentBlockType(value: unknown): JourneyContentBlock["type"] {
   const allowed: JourneyContentBlock["type"][] = ["text", "quote", "image", "video", "audio", "divider", "prompt", "reward", "game", "photo_task"];
-  return allowed.includes(value as JourneyContentBlock["type"]) ? (value as JourneyContentBlock["type"]) : "text";
+  return requireSupportedValue(value, allowed, "içerik blok tipi");
 }
 
 function normalizeTaskResponseType(value: unknown): JourneyTaskResponse["type"] {
   const allowed: JourneyTaskResponse["type"][] = ["photo", "mini_game", "text", "reward", "generic"];
-  return allowed.includes(value as JourneyTaskResponse["type"]) ? (value as JourneyTaskResponse["type"]) : "generic";
+  return requireSupportedValue(value, allowed, "görev yanıt tipi");
 }
 
 function normalizeTaskStatus(value: unknown): JourneyTaskResponse["status"] {
   const allowed: JourneyTaskResponse["status"][] = ["draft", "submitted", "completed"];
-  return allowed.includes(value as JourneyTaskResponse["status"]) ? (value as JourneyTaskResponse["status"]) : "submitted";
+  return requireSupportedValue(value, allowed, "görev yanıt durumu");
 }
 
 function normalizeMiniGameType(value: unknown): JourneyMiniGame["type"] {
   const allowed: JourneyMiniGame["type"][] = ["memory_match", "tap_sequence", "scratch_reveal", "choice", "reaction_duel", "couple_quiz", "penalty_picker"];
-  return allowed.includes(value as JourneyMiniGame["type"]) ? (value as JourneyMiniGame["type"]) : "tap_sequence";
+  return requireSupportedValue(value, allowed, "mini oyun tipi");
+}
+
+function requireSupportedValue<T extends string>(value: unknown, allowed: readonly T[], label: string): T {
+  if (typeof value === "string" && allowed.includes(value as T)) {
+    return value as T;
+  }
+
+  throw new Error(`Desteklenmeyen ${label}: ${String(value ?? "eksik")}`);
 }
 
 function getFileExtension(file: File) {

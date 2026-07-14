@@ -1,4 +1,4 @@
-export type SceneType = "welcome" | "story" | "task" | "memory" | "locked" | "final";
+export type SceneType = "welcome" | "story" | "task" | "memory" | "locked" | "final" | "chapter";
 
 export type BackgroundVariant = "night" | "rose" | "champagne" | "deep";
 

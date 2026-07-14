@@ -76,13 +76,29 @@ export function MiniGameCard({
     );
   }
 
+  if (game?.type === "tap_sequence") {
+    return (
+      <TapSequenceGame
+        game={game}
+        isCompleted={scene.progressIsCompleted || scene.taskResponse?.type === "mini_game"}
+        isSubmitting={isSubmitting}
+        onComplete={onComplete}
+      />
+    );
+  }
+
   return (
-    <TapSequenceGame
-      game={game}
-      isCompleted={scene.progressIsCompleted || scene.taskResponse?.type === "mini_game"}
-      isSubmitting={isSubmitting}
-      onComplete={onComplete}
-    />
+    <PremiumCard className="w-full p-5">
+      <div className="flex h-12 w-12 items-center justify-center rounded-full border border-[#f0b7c6]/20 bg-[#f0b7c6]/10 text-[#f0b7c6]">
+        <RotateCcw size={20} strokeWidth={1.6} />
+      </div>
+      <p className="mt-5 text-2xl font-semibold leading-tight text-[#fffaf2]">
+        Mini oyun görünümü hazır değil
+      </p>
+      <p className="mt-3 text-sm leading-6 text-[#fffaf2]/62">
+        {game ? `${game.type} türü bu sürümde etkileşimli olarak desteklenmiyor.` : "Bu sahneye geçerli bir mini oyun bağlanmamış."}
+      </p>
+    </PremiumCard>
   );
 }
 

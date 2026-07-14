@@ -15,14 +15,16 @@ export function PhotoTaskCard({
 }: {
   scene: JourneyScene;
   isSubmitting: boolean;
-  onSubmit: (file: File, rewardKey?: string | null) => void;
+  onSubmit: (file: File, rewardKey?: string | null) => void | Promise<void>;
 }) {
   const reduceMotion = useReducedMotion();
   const inputRef = useRef<HTMLInputElement>(null);
+  const submitInFlightRef = useRef(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [isLocallySubmitting, setIsLocallySubmitting] = useState(false);
 
   const photoBlock = scene.contentBlocks.find((block) => block.type === "photo_task");
   const rewardKey = getStringMetadata(photoBlock?.metadata, "reward_key") ?? getStringMetadata(photoBlock?.metadata, "rewardKey");
@@ -80,10 +82,20 @@ export function PhotoTaskCard({
     setPreviewUrl(nextPreviewUrl);
   }
 
-  function submitPhoto() {
-    if (!selectedFile) return;
-    onSubmit(selectedFile, rewardKey);
+  async function submitPhoto() {
+    if (!selectedFile || isSubmitting || submitInFlightRef.current) return;
+
+    submitInFlightRef.current = true;
+    setIsLocallySubmitting(true);
+    try {
+      await onSubmit(selectedFile, rewardKey);
+    } finally {
+      submitInFlightRef.current = false;
+      setIsLocallySubmitting(false);
+    }
   }
+
+  const isSubmitBusy = isSubmitting || isLocallySubmitting;
 
   return (
     <PremiumCard className="w-full p-5">
@@ -142,14 +154,15 @@ export function PhotoTaskCard({
         <button
           className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/12 bg-white/[0.07] px-4 text-sm font-medium text-[#fffaf2]/82 backdrop-blur transition hover:bg-white/[0.1] active:translate-y-px"
           type="button"
+          disabled={isSubmitBusy}
           onClick={() => inputRef.current?.click()}
         >
           <Camera size={17} strokeWidth={1.7} />
           {imageUrl ? "Fotoğrafı Değiştir" : "Fotoğraf Çek"}
         </button>
 
-        <PrimaryActionButton disabled={!selectedFile || isSubmitting} onClick={submitPhoto}>
-          {isSubmitting ? "Kaydediliyor" : isCompleted && !selectedFile ? "Kalbime Kaydedildi" : "Fotoğrafı Kaydet"}
+        <PrimaryActionButton disabled={!selectedFile || isSubmitBusy} onClick={submitPhoto}>
+          {isSubmitBusy ? "Kaydediliyor" : isCompleted && !selectedFile ? "Kalbime Kaydedildi" : "Fotoğrafı Kaydet"}
           <Upload size={18} strokeWidth={1.7} />
         </PrimaryActionButton>
       </div>

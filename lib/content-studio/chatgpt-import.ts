@@ -64,6 +64,11 @@ export function buildImportChanges(current: ContentStudioData, incoming: Record<
 
       const id = typeof row.id === "string" ? row.id : null;
       const action = id && existingIds.has(id) ? "update" : "insert";
+      const validationError = getRowValidationError(table as StudioTable, row, action);
+      if (validationError) {
+        warnings.push(`${table}: ${validationError} Satır atlandı.`);
+        continue;
+      }
       if (id && action === "insert") {
         warnings.push(`${table}: Bilinmeyen id ${id}; yeni kayıt olarak uygulanacak.`);
       }
@@ -78,6 +83,38 @@ export function buildImportChanges(current: ContentStudioData, incoming: Record<
   }
 
   return { warnings, changes };
+}
+
+function getRowValidationError(table: StudioTable, row: Record<string, unknown>, action: "insert" | "update") {
+  if (table === "journey_scenes") {
+    return validateEnum(row.type ?? row.scene_type, ["welcome", "story", "task", "memory", "locked", "final", "chapter"], "desteklenmeyen sahne tipi", action === "update");
+  }
+  if (table === "journey_scene_content_blocks") {
+    return validateEnum(row.block_type, ["text", "quote", "image", "video", "audio", "divider", "prompt", "reward", "game", "photo_task"], "desteklenmeyen içerik blok tipi", action === "update");
+  }
+  if (table === "journey_mini_games") {
+    return validateEnum(row.game_type, ["memory_match", "tap_sequence", "scratch_reveal", "choice", "reaction_duel", "couple_quiz", "penalty_picker"], "desteklenmeyen mini oyun tipi", action === "update");
+  }
+  if (table === "journey_scene_unlock_rules") {
+    return validateEnum(row.unlock_mode, ["manual", "time", "all_completed", "time_and_all_completed"], "desteklenmeyen unlock modu", action === "update");
+  }
+  if (table === "journey_media_requirements") {
+    return validateEnum(row.media_type, ["image", "video", "background", "none"], "desteklenmeyen medya tipi", action === "update");
+  }
+  if (
+    table === "journey_scene_dependencies" &&
+    typeof row.trigger_scene_slug === "string" &&
+    row.trigger_scene_slug === row.target_scene_slug
+  ) {
+    return "sahne kendisine dependency olamaz.";
+  }
+  return null;
+}
+
+function validateEnum(value: unknown, allowed: readonly string[], label: string, optional: boolean) {
+  if (optional && (value === undefined || value === null)) return null;
+  if (typeof value === "string" && allowed.includes(value)) return null;
+  return `${label}: ${String(value ?? "eksik")}.`;
 }
 
 function getRowLabel(table: string, row: Record<string, unknown>) {

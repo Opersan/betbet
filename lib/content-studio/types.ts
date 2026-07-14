@@ -1,7 +1,7 @@
 export type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
 export type JsonRecord = Record<string, JsonValue>;
 
-export type SceneType = "welcome" | "story" | "task" | "memory" | "locked" | "final";
+export type SceneType = "welcome" | "story" | "task" | "memory" | "locked" | "final" | "chapter";
 export type BackgroundVariant = "night" | "rose" | "champagne" | "deep";
 export type UnlockMode = "time" | "all_completed" | "time_and_all_completed" | "manual";
 

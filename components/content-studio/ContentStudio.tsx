@@ -6,30 +6,26 @@ import {
   Copy,
   Download,
   Eye,
-  Gift,
   Lock,
   Plus,
   RefreshCcw,
   Save,
   Trash2,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MobileSceneLayout } from "@/components/layout/MobileSceneLayout";
-import { JourneyContentBlocks } from "@/components/ui/JourneyContentBlocks";
-import { LockedRevealCard } from "@/components/ui/LockedRevealCard";
-import { MemoryCard } from "@/components/ui/MemoryCard";
-import { MiniGameCard } from "@/components/ui/MiniGameCard";
-import { PremiumCard } from "@/components/ui/PremiumCard";
-import { RewardRevealStack } from "@/components/ui/RewardRevealStack";
-import { TaskCard } from "@/components/ui/TaskCard";
+import { ChapterRevealScene } from "@/components/scene/ChapterRevealScene";
+import { JourneySceneRenderer, type CompleteMiniGameParams } from "@/components/scene/JourneySceneRenderer";
 import { buildChatGptPrompt, type ExportScope } from "@/lib/content-studio/chatgpt-export";
 import { buildImportChanges, parseChatGptJson, type ImportChange } from "@/lib/content-studio/chatgpt-import";
+import { getContentReadinessIssues } from "@/lib/content-studio/readiness";
 import {
   CONTENT_STUDIO_ACCESS_CODE,
   CONTENT_STUDIO_TIMEZONE,
   getTaskUploadSignedUrl,
   loadContentStudioData,
   mutateContentStudio,
+  removeTaskUploadFiles,
 } from "@/lib/content-studio/scenes";
 import type {
   BackgroundVariant,
@@ -49,6 +45,7 @@ import type {
   StudioUnlockSchedule,
 } from "@/lib/content-studio/types";
 import type { JourneyContentBlock, JourneyMiniGame, JourneyReward, JourneyScene, JourneyTaskResponse } from "@/lib/journey/types";
+import { getChapterNumber } from "@/lib/journey/chapters";
 import { cn } from "@/lib/utils";
 import { JsonConfigEditor } from "./JsonConfigEditor";
 import { MediaUploadField } from "./MediaUploadField";
@@ -67,7 +64,7 @@ const tabs: Array<{ key: TabKey; label: string }> = [
   { key: "timeline", label: "Timeline" },
 ];
 
-const sceneTypes: SceneType[] = ["welcome", "story", "task", "memory", "locked", "final"];
+const sceneTypes: SceneType[] = ["welcome", "story", "task", "memory", "locked", "final", "chapter"];
 const backgroundVariants: BackgroundVariant[] = ["night", "rose", "champagne", "deep"];
 const blockTypes: StudioContentBlock["block_type"][] = ["text", "quote", "image", "video", "audio", "divider", "prompt", "reward", "game", "photo_task"];
 const gameTypes: StudioMiniGame["game_type"][] = ["reaction_duel", "couple_quiz", "penalty_picker", "tap_sequence", "memory_match", "scratch_reveal", "choice"];
@@ -103,6 +100,7 @@ export function ContentStudio() {
   const [isSaving, setIsSaving] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const resetInFlightRef = useRef(false);
 
   const selectedScene = useMemo(
     () => data.scenes.find((scene) => scene.slug === selectedSlug) ?? data.scenes[0] ?? null,
@@ -152,6 +150,59 @@ export function ContentStudio() {
     }
   }
 
+  async function resetTestState() {
+    if (resetInFlightRef.current) return;
+    if (!activeAccessCode) {
+      setError("Sıfırlanacak access code bulunamadı.");
+      return;
+    }
+
+    const taskResponses = data.taskResponses.filter((response) => response.access_code_id === activeAccessCode.id);
+    const testFiles = taskResponses.flatMap((response) =>
+      response.storage_bucket && response.storage_path
+        ? [{ bucket: response.storage_bucket, path: response.storage_path }]
+        : [],
+    );
+    const confirmed = window.confirm(
+      `${activeAccessCode.code} için progress, ${taskResponses.length} görev sonucu ve reward claim kayıtları sıfırlansın mı? Bu işlem gerçek içerikleri ve sahne sırasını değiştirmez.`,
+    );
+    if (!confirmed) return;
+    resetInFlightRef.current = true;
+    const deleteTestFiles =
+      testFiles.length > 0 &&
+      window.confirm(
+        `${testFiles.length} test görevi dosyası Storage alanından da silinsin mi?\n\n${testFiles.map((file) => file.path).join("\n")}`,
+      );
+
+    setIsSaving(true);
+    setError(null);
+    try {
+      await mutateContentStudio("journey_reward_claims", "reset_for_access_code", {
+        access_code_id: activeAccessCode.id,
+      });
+      for (const response of taskResponses) {
+        await mutateContentStudio("journey_task_responses", "delete", { id: response.id });
+      }
+      await mutateContentStudio("journey_progress", "reset_for_access_code", {
+        access_code_id: activeAccessCode.id,
+      });
+
+      if (deleteTestFiles) {
+        await removeTaskUploadFiles(testFiles);
+      }
+
+      setNotice(
+        "Test durumu sıfırlandı. Tarayıcı konumunu da başa almak için journey sayfasının site verilerindeki romanticJourney.* localStorage anahtarlarını temizle.",
+      );
+      await refresh();
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError));
+    } finally {
+      resetInFlightRef.current = false;
+      setIsSaving(false);
+    }
+  }
+
   const filteredScenes = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     return data.scenes
@@ -193,7 +244,12 @@ export function ContentStudio() {
             onQueryChange={setQuery}
             onTypeFilterChange={setTypeFilter}
             onLockFilterChange={setLockFilter}
-            onSelect={(scene) => setSelectedSlug(scene.slug)}
+            onSelect={(scene) => {
+              setSelectedSlug(scene.slug);
+              if (scene.type === "chapter" && activeTab !== "scene" && activeTab !== "unlock") {
+                setActiveTab("scene");
+              }
+            }}
             onToggleSelected={(sceneId) =>
               setSelectedSceneIds((ids) => (ids.includes(sceneId) ? ids.filter((id) => id !== sceneId) : [...ids, sceneId]))
             }
@@ -205,6 +261,23 @@ export function ContentStudio() {
                 title: "Yeni sahne",
                 sort_order: nextOrder,
                 background_variant: "night",
+                is_active: true,
+              });
+            }}
+            onAddChapter={() => {
+              const nextOrder = Math.max(0, ...data.scenes.map((scene) => scene.sort_order)) + 10;
+              const slug = `chapter-${Date.now()}`;
+              setSelectedSlug(slug);
+              setActiveTab("scene");
+              runMutation("Yeni bölüm eklendi.", "journey_scenes", "insert", {
+                slug,
+                type: "chapter",
+                title: "Yeni Bölüm",
+                subtitle: null,
+                sort_order: nextOrder,
+                background_variant: "night",
+                primary_action_label: null,
+                is_locked: false,
                 is_active: true,
               });
             }}
@@ -245,6 +318,7 @@ export function ContentStudio() {
             onTabChange={setActiveTab}
             onMutation={runMutation}
             onRefresh={refresh}
+            onResetTestState={resetTestState}
           />
 
           <ScenePreviewPanel
@@ -335,6 +409,7 @@ function SceneListPanel({
   onSelect,
   onToggleSelected,
   onAddScene,
+  onAddChapter,
   onDuplicate,
   onDelete,
   onReorder,
@@ -356,6 +431,7 @@ function SceneListPanel({
   onSelect: (scene: StudioScene) => void;
   onToggleSelected: (sceneId: string) => void;
   onAddScene: () => void;
+  onAddChapter: () => void;
   onDuplicate: (scene: StudioScene) => void;
   onDelete: (scene: StudioScene) => void;
   onReorder: (sceneId: string, direction: "up" | "down") => void;
@@ -364,6 +440,9 @@ function SceneListPanel({
   onBulkBackground: (variant: BackgroundVariant) => void;
 }) {
   const [draggingId, setDraggingId] = useState<string | null>(null);
+  const readinessIssues = useMemo(() => getContentReadinessIssues(data), [data]);
+  const readinessErrors = readinessIssues.filter((issue) => issue.severity === "error").length;
+  const readinessWarnings = readinessIssues.length - readinessErrors;
 
   return (
     <aside className="studio-panel flex min-h-0 flex-col">
@@ -373,9 +452,14 @@ function SceneListPanel({
             <p className="font-semibold">Sahneler</p>
             <p className="mt-1 text-xs text-[#fffaf2]/50">{allScenes.length} kayıt</p>
           </div>
-          <button className="studio-icon-button" type="button" onClick={onAddScene} title="Yeni sahne">
-            <Plus size={17} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button className="studio-button px-2.5 py-1.5 text-xs" type="button" onClick={onAddChapter} title="Yeni bölüm">
+              <Plus size={14} /> Bölüm
+            </button>
+            <button className="studio-icon-button" type="button" onClick={onAddScene} title="Yeni sahne">
+              <Plus size={17} />
+            </button>
+          </div>
         </div>
         <input className="studio-input" value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Başlık veya slug ara" />
         <div className="grid grid-cols-2 gap-2">
@@ -411,6 +495,38 @@ function SceneListPanel({
             </select>
           </div>
         ) : null}
+        <div className="rounded-[8px] border border-white/10 bg-white/[0.035] p-3">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-xs font-semibold text-[#fffaf2]/82">Yayına Hazırlık Kontrolü</p>
+            <span className="text-[10px] text-[#fffaf2]/48">
+              {readinessErrors} hata, {readinessWarnings} uyarı
+            </span>
+          </div>
+          {readinessIssues.length > 0 ? (
+            <div className="mt-2 max-h-32 space-y-2 overflow-y-auto pr-1">
+              {readinessIssues.map((issue, index) => (
+                <button
+                  key={`${issue.code}-${issue.sceneId}-${index}`}
+                  className={cn(
+                    "block w-full rounded-[6px] border px-2 py-1.5 text-left text-[10px] leading-4",
+                    issue.severity === "error"
+                      ? "border-[#f0b7c6]/24 bg-[#f0b7c6]/8 text-[#f0b7c6]"
+                      : "border-[#f4dcc0]/18 bg-[#f4dcc0]/7 text-[#f4dcc0]/76",
+                  )}
+                  type="button"
+                  onClick={() => {
+                    const issueScene = allScenes.find((scene) => scene.id === issue.sceneId);
+                    if (issueScene) onSelect(issueScene);
+                  }}
+                >
+                  <span className="font-semibold">{issue.sceneSlug}</span>: {issue.message}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-2 text-[10px] leading-4 text-[#b9dfca]/72">İçerik ve ilişki kontrollerinde sorun bulunmadı.</p>
+          )}
+        </div>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
@@ -491,6 +607,7 @@ function SceneEditorPanel({
   onTabChange,
   onMutation,
   onRefresh,
+  onResetTestState,
 }: {
   data: ContentStudioData;
   scene: StudioScene | null;
@@ -505,6 +622,7 @@ function SceneEditorPanel({
     payload: Record<string, unknown>,
   ) => Promise<void>;
   onRefresh: () => void;
+  onResetTestState: () => void;
 }) {
   if (!scene) {
     return (
@@ -514,16 +632,21 @@ function SceneEditorPanel({
     );
   }
 
+  const visibleTabs = scene.type === "chapter"
+    ? tabs.filter((tab) => tab.key === "scene" || tab.key === "unlock")
+    : tabs;
+  const effectiveTab = visibleTabs.some((tab) => tab.key === activeTab) ? activeTab : "scene";
+
   return (
     <section className="studio-panel flex min-h-0 flex-col">
       <div className="border-b border-white/10 p-4">
         <p className="text-xl font-semibold">{scene.title}</p>
         <p className="mt-1 text-xs text-[#fffaf2]/50">{scene.slug}</p>
         <div className="mt-4 flex flex-wrap gap-2">
-          {tabs.map((tab) => (
+          {visibleTabs.map((tab) => (
             <button
               key={tab.key}
-              className={cn("rounded-full border px-3 py-1.5 text-xs", activeTab === tab.key ? "border-[#f4dcc0]/34 bg-[#f4dcc0]/12 text-[#f4dcc0]" : "border-white/10 bg-white/[0.04] text-[#fffaf2]/62")}
+              className={cn("rounded-full border px-3 py-1.5 text-xs", effectiveTab === tab.key ? "border-[#f4dcc0]/34 bg-[#f4dcc0]/12 text-[#f4dcc0]" : "border-white/10 bg-white/[0.04] text-[#fffaf2]/62")}
               type="button"
               onClick={() => onTabChange(tab.key)}
             >
@@ -533,14 +656,14 @@ function SceneEditorPanel({
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        {activeTab === "scene" ? <SceneDetailsForm key={`${scene.id}-${scene.slug}-${scene.sort_order}`} scene={scene} isSaving={isSaving} onSave={(payload) => onMutation("Sahne kaydedildi.", "journey_scenes", "update", payload)} /> : null}
-        {activeTab === "blocks" ? <ContentBlocksEditor scene={scene} blocks={data.contentBlocks.filter((block) => block.scene_slug === scene.slug).sort((a, b) => a.sort_order - b.sort_order)} onMutation={onMutation} /> : null}
-        {activeTab === "unlock" ? <UnlockSettingsEditor key={`${scene.id}-${data.unlockRules.find((rule) => rule.target_scene_slug === scene.slug)?.updated_at ?? "no-rule"}-${data.unlockSchedule.find((item) => item.scene_slug === scene.slug)?.unlock_at ?? "no-schedule"}`} scene={scene} scenes={data.scenes} rule={data.unlockRules.find((rule) => rule.target_scene_slug === scene.slug) ?? null} schedule={data.unlockSchedule.find((item) => item.scene_slug === scene.slug) ?? null} dependencies={data.dependencies.filter((item) => item.target_scene_slug === scene.slug)} onMutation={onMutation} /> : null}
-        {activeTab === "game" ? <MiniGameEditor key={`${scene.id}-${data.miniGames.find((item) => item.scene_slug === scene.slug)?.updated_at ?? "no-game"}`} scene={scene} game={data.miniGames.find((item) => item.scene_slug === scene.slug) ?? null} onMutation={onMutation} /> : null}
-        {activeTab === "reward" ? <RewardEditor scene={scene} rewards={data.rewards.filter((reward) => reward.scene_slug === scene.slug)} claims={data.rewardClaims.filter((claim) => claim.scene_id === scene.id)} onMutation={onMutation} /> : null}
-        {activeTab === "progress" ? <ProgressViewer scene={scene} accessCode={accessCode} progress={data.progress.find((item) => item.scene_id === scene.id && item.access_code_id === accessCode?.id) ?? null} taskResponses={data.taskResponses.filter((item) => item.scene_id === scene.id)} rewardClaims={data.rewardClaims.filter((item) => item.scene_id === scene.id)} onMutation={onMutation} /> : null}
-        {activeTab === "json" ? <ChatGptPanel data={data} scene={scene} onMutation={onMutation} onRefresh={onRefresh} /> : null}
-        {activeTab === "timeline" ? <TimelineView data={data} onMutation={onMutation} /> : null}
+        {effectiveTab === "scene" ? <SceneDetailsForm key={`${scene.id}-${scene.slug}-${scene.sort_order}`} scene={scene} isSaving={isSaving} onSave={(payload) => onMutation("Sahne kaydedildi.", "journey_scenes", "update", payload)} /> : null}
+        {effectiveTab === "blocks" ? <ContentBlocksEditor scene={scene} blocks={data.contentBlocks.filter((block) => block.scene_slug === scene.slug).sort((a, b) => a.sort_order - b.sort_order)} onMutation={onMutation} /> : null}
+        {effectiveTab === "unlock" ? <UnlockSettingsEditor key={`${scene.id}-${data.unlockRules.find((rule) => rule.target_scene_slug === scene.slug)?.updated_at ?? "no-rule"}-${data.unlockSchedule.find((item) => item.scene_slug === scene.slug)?.unlock_at ?? "no-schedule"}`} scene={scene} scenes={data.scenes} rule={data.unlockRules.find((rule) => rule.target_scene_slug === scene.slug) ?? null} schedule={data.unlockSchedule.find((item) => item.scene_slug === scene.slug) ?? null} dependencies={data.dependencies.filter((item) => item.target_scene_slug === scene.slug)} onMutation={onMutation} /> : null}
+        {effectiveTab === "game" ? <MiniGameEditor key={`${scene.id}-${data.miniGames.find((item) => item.scene_slug === scene.slug)?.updated_at ?? "no-game"}`} scene={scene} game={data.miniGames.find((item) => item.scene_slug === scene.slug) ?? null} onMutation={onMutation} /> : null}
+        {effectiveTab === "reward" ? <RewardEditor scene={scene} rewards={data.rewards.filter((reward) => reward.scene_slug === scene.slug)} claims={data.rewardClaims.filter((claim) => claim.scene_id === scene.id)} onMutation={onMutation} /> : null}
+        {effectiveTab === "progress" ? <ProgressViewer scene={scene} accessCode={accessCode} progress={data.progress.find((item) => item.scene_id === scene.id && item.access_code_id === accessCode?.id) ?? null} taskResponses={data.taskResponses.filter((item) => item.scene_id === scene.id && item.access_code_id === accessCode?.id)} rewardClaims={data.rewardClaims.filter((item) => item.scene_id === scene.id && item.access_code_id === accessCode?.id)} accessTaskResponses={data.taskResponses.filter((item) => item.access_code_id === accessCode?.id)} onResetTestState={onResetTestState} onMutation={onMutation} /> : null}
+        {effectiveTab === "json" ? <ChatGptPanel data={data} scene={scene} onMutation={onMutation} onRefresh={onRefresh} /> : null}
+        {effectiveTab === "timeline" ? <TimelineView data={data} onMutation={onMutation} /> : null}
       </div>
     </section>
   );
@@ -548,31 +671,55 @@ function SceneEditorPanel({
 
 function SceneDetailsForm({ scene, isSaving, onSave }: { scene: StudioScene; isSaving: boolean; onSave: (payload: Record<string, unknown>) => void }) {
   const [form, setForm] = useState(scene);
+  const isChapter = form.type === "chapter";
 
   return (
     <div className="grid gap-4">
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Slug" value={form.slug} onChange={(value) => setForm({ ...form, slug: value })} />
-        <SelectField label="Type" value={form.type} options={sceneTypes} onChange={(value) => setForm({ ...form, type: value as SceneType })} />
+        {isChapter ? (
+          <div className="rounded-[8px] border border-white/10 bg-white/[0.04] px-3 py-2">
+            <span className="studio-label">Sistem kimliği</span>
+            <p className="truncate text-sm text-[#fffaf2]/62">{form.slug}</p>
+          </div>
+        ) : (
+          <Field label="Slug" value={form.slug} onChange={(value) => setForm({ ...form, slug: value })} />
+        )}
+        <SelectField label="Sahne tipi" value={form.type} options={sceneTypes} onChange={(value) => setForm({ ...form, type: value as SceneType })} />
       </div>
-      <Field label="Başlık" value={form.title} onChange={(value) => setForm({ ...form, title: value })} />
-      <Field label="Subtitle" value={form.subtitle ?? ""} onChange={(value) => setForm({ ...form, subtitle: value || null })} />
-      <TextAreaField label="Ana içerik" value={form.content ?? ""} onChange={(value) => setForm({ ...form, content: value || null })} rows={8} />
-      <div className="grid grid-cols-2 gap-3">
-        <MediaUploadField sceneSlug={form.slug} label="Image URL" value={form.image_url} onChange={(url) => setForm({ ...form, image_url: url })} />
-        <MediaUploadField sceneSlug={form.slug} label="Video URL" value={form.video_url} onChange={(url) => setForm({ ...form, video_url: url })} />
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        <Field label="Date label" value={form.date_label ?? ""} onChange={(value) => setForm({ ...form, date_label: value || null })} />
-        <Field label="Sort order" type="number" value={String(form.sort_order)} onChange={(value) => setForm({ ...form, sort_order: Number(value) })} />
-        <SelectField label="Background" value={form.background_variant ?? ""} options={["", ...backgroundVariants]} onChange={(value) => setForm({ ...form, background_variant: value ? (value as BackgroundVariant) : null })} />
-      </div>
-      <div className="grid grid-cols-3 gap-3">
-        <CheckField label="Temel kilitli" checked={form.is_locked} onChange={(checked) => setForm({ ...form, is_locked: checked })} />
-        <CheckField label="Aktif" checked={form.is_active} onChange={(checked) => setForm({ ...form, is_active: checked })} />
-        <Field label="Primary action" value={form.primary_action_label ?? ""} onChange={(value) => setForm({ ...form, primary_action_label: value || null })} />
-      </div>
-      <TextAreaField label="Unlock condition text" value={form.unlock_condition ?? ""} onChange={(value) => setForm({ ...form, unlock_condition: value || null })} rows={3} />
+      <Field label={isChapter ? "Bölüm başlığı" : "Başlık"} value={form.title} onChange={(value) => setForm({ ...form, title: value })} />
+      <Field label={isChapter ? "Opsiyonel alt cümle" : "Subtitle"} value={form.subtitle ?? ""} onChange={(value) => setForm({ ...form, subtitle: value || null })} />
+      {isChapter ? (
+        <>
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="Sort order" type="number" value={String(form.sort_order)} onChange={(value) => setForm({ ...form, sort_order: Number(value) })} />
+            <CheckField label="Temel kilitli" checked={form.is_locked} onChange={(checked) => setForm({ ...form, is_locked: checked })} />
+            <CheckField label="Aktif" checked={form.is_active} onChange={(checked) => setForm({ ...form, is_active: checked })} />
+          </div>
+          <TextAreaField label="Unlock condition text" value={form.unlock_condition ?? ""} onChange={(value) => setForm({ ...form, unlock_condition: value || null })} rows={3} />
+          <p className="rounded-[8px] border border-[#f4dcc0]/14 bg-[#f4dcc0]/7 px-3 py-2 text-xs leading-5 text-[#f4dcc0]/68">
+            Medya, içerik blokları, görev, mini oyun ve ödül alanları chapter sahnelerinde kullanılmaz. Ayrıntılı zamanlama için Kilit ve Zaman sekmesini kullan.
+          </p>
+        </>
+      ) : (
+        <>
+          <TextAreaField label="Ana içerik" value={form.content ?? ""} onChange={(value) => setForm({ ...form, content: value || null })} rows={8} />
+          <div className="grid grid-cols-2 gap-3">
+            <MediaUploadField sceneSlug={form.slug} label="Image URL" value={form.image_url} onChange={(url) => setForm({ ...form, image_url: url })} />
+            <MediaUploadField sceneSlug={form.slug} label="Video URL" value={form.video_url} onChange={(url) => setForm({ ...form, video_url: url })} />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <Field label="Date label" value={form.date_label ?? ""} onChange={(value) => setForm({ ...form, date_label: value || null })} />
+            <Field label="Sort order" type="number" value={String(form.sort_order)} onChange={(value) => setForm({ ...form, sort_order: Number(value) })} />
+            <SelectField label="Background" value={form.background_variant ?? ""} options={["", ...backgroundVariants]} onChange={(value) => setForm({ ...form, background_variant: value ? (value as BackgroundVariant) : null })} />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            <CheckField label="Temel kilitli" checked={form.is_locked} onChange={(checked) => setForm({ ...form, is_locked: checked })} />
+            <CheckField label="Aktif" checked={form.is_active} onChange={(checked) => setForm({ ...form, is_active: checked })} />
+            <Field label="Primary action" value={form.primary_action_label ?? ""} onChange={(value) => setForm({ ...form, primary_action_label: value || null })} />
+          </div>
+          <TextAreaField label="Unlock condition text" value={form.unlock_condition ?? ""} onChange={(value) => setForm({ ...form, unlock_condition: value || null })} rows={3} />
+        </>
+      )}
       <button className="studio-primary-button justify-self-start" type="button" disabled={isSaving} onClick={() => onSave(form)}>
         <Save size={16} /> {isSaving ? "Kaydediliyor" : "Kaydet"}
       </button>
@@ -883,6 +1030,8 @@ function ProgressViewer({
   progress,
   taskResponses,
   rewardClaims,
+  accessTaskResponses,
+  onResetTestState,
   onMutation,
 }: {
   scene: StudioScene;
@@ -890,9 +1039,12 @@ function ProgressViewer({
   progress: StudioProgress | null;
   taskResponses: StudioTaskResponse[];
   rewardClaims: StudioRewardClaim[];
+  accessTaskResponses: StudioTaskResponse[];
+  onResetTestState: () => void;
   onMutation: ContentStudioMutation;
 }) {
   const [signedUrl, setSignedUrl] = useState<string | null>(null);
+  const testPhotos = accessTaskResponses.filter((response) => response.storage_bucket && response.storage_path);
 
   async function openStorage(response: StudioTaskResponse) {
     if (!response.storage_bucket || !response.storage_path) return;
@@ -903,6 +1055,30 @@ function ProgressViewer({
 
   return (
     <div className="grid gap-4">
+      <div className="rounded-[8px] border border-[#f0b7c6]/18 bg-[#f0b7c6]/7 p-4">
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <p className="text-sm font-semibold">Test Durumunu Sıfırla</p>
+            <p className="mt-1 text-xs leading-5 text-[#fffaf2]/54">
+              Seçili access code için progress, görev cevapları ve reward claim kayıtlarını kullanıcı onayıyla temizler.
+            </p>
+          </div>
+          <button className="studio-button shrink-0 text-[#f0b7c6]" type="button" disabled={!accessCode} onClick={onResetTestState}>
+            <RefreshCcw size={15} /> Sıfırla
+          </button>
+        </div>
+        <div className="mt-3 rounded-[7px] border border-white/8 bg-black/15 p-3 text-xs text-[#fffaf2]/54">
+          <p className="font-medium text-[#fffaf2]/72">Yüklenmiş test fotoğrafları: {testPhotos.length}</p>
+          {testPhotos.length > 0 ? (
+            <ul className="mt-2 max-h-28 space-y-1 overflow-auto font-mono text-[10px] text-[#fffaf2]/46">
+              {testPhotos.map((response) => <li key={response.id}>{response.storage_path}</li>)}
+            </ul>
+          ) : null}
+          <p className="mt-2 leading-5">
+            Storage dosyaları ayrı bir onayla silinir. Tarayıcı konumu için journey sayfasının site verilerindeki romanticJourney.* localStorage anahtarlarını temizle.
+          </p>
+        </div>
+      </div>
       <div className="rounded-[8px] border border-white/10 bg-white/[0.04] p-4">
         <p className="text-sm font-semibold">Progress · {accessCode?.code ?? "Access code yok"}</p>
         {progress ? (
@@ -911,7 +1087,6 @@ function ProgressViewer({
             <button className="studio-button" type="button" onClick={() => onMutation("Sahne kilitlendi.", "journey_progress", "update", { id: progress.id, is_unlocked: false, is_completed: false })}>Kilitli Yap</button>
             <button className="studio-button" type="button" onClick={() => onMutation("Sahne tamamlandı.", "journey_progress", "update", { id: progress.id, is_unlocked: true, is_completed: true, completed_at: new Date().toISOString() })}>Tamamlandı Yap</button>
             <button className="studio-button" type="button" onClick={() => onMutation("Tamamlanma sıfırlandı.", "journey_progress", "update", { id: progress.id, is_completed: false })}>Tamamlanmayı Sıfırla</button>
-            {accessCode ? <button className="studio-button text-[#f0b7c6]" type="button" onClick={() => window.confirm("Seçili access code progress sıfırlansın mı?") && onMutation("Progress sıfırlandı.", "journey_progress", "reset_for_access_code", { access_code_id: accessCode.id })}>Tüm Progress Reset</button> : null}
           </div>
         ) : (
           <p className="mt-2 text-sm text-[#fffaf2]/48">Progress kaydı yok.</p>
@@ -920,9 +1095,6 @@ function ProgressViewer({
       <div className="rounded-[8px] border border-white/10 bg-white/[0.04] p-4">
         <div className="flex items-center justify-between">
           <p className="text-sm font-semibold">Task responses</p>
-          <button className="studio-button text-[#f0b7c6]" type="button" onClick={() => window.confirm("Bu sahnenin task response kayıtları silinsin mi?") && onMutation("Task response kayıtları temizlendi.", "journey_task_responses", "delete_for_scene", { scene_id: scene.id })}>
-            Sahneyi Temizle
-          </button>
         </div>
         {taskResponses.map((response) => (
           <div key={response.id} className="mt-3 rounded-[8px] border border-white/10 bg-[#080a16] p-3 text-xs">
@@ -1030,7 +1202,7 @@ function TimelineView({ data, onMutation }: { data: ContentStudioData; onMutatio
           </tr>
         </thead>
         <tbody>
-          {data.scenes.sort((a, b) => a.sort_order - b.sort_order).map((scene) => {
+          {data.scenes.toSorted((a, b) => a.sort_order - b.sort_order).map((scene) => {
             const rule = data.unlockRules.find((item) => item.target_scene_slug === scene.slug);
             const schedule = data.unlockSchedule.find((item) => item.scene_slug === scene.slug);
             const deps = data.dependencies.filter((item) => item.target_scene_slug === scene.slug);
@@ -1053,7 +1225,52 @@ function TimelineView({ data, onMutation }: { data: ContentStudioData; onMutatio
 }
 
 function ScenePreviewPanel({ data, scene, previewMode, onPreviewModeChange, onReplay }: { data: ContentStudioData; scene: StudioScene | null; previewMode: PreviewMode; onPreviewModeChange: (mode: PreviewMode) => void; onReplay: () => void }) {
-  const journeyScene = scene ? buildJourneyScene(scene, data, previewMode) : null;
+  const effectivePreviewMode = scene?.type === "chapter" && (previewMode === "task_pending" || previewMode === "task_done")
+    ? "normal"
+    : previewMode;
+  const [journeyScene, setJourneyScene] = useState<JourneyScene | null>(() =>
+    scene ? buildJourneyScene(scene, data, effectivePreviewMode) : null,
+  );
+  const [previewMediaUrl, setPreviewMediaUrl] = useState<string | null>(null);
+  const chapterNumber = scene
+    ? getChapterNumber(
+        data.scenes.map((item) => ({
+          id: item.id,
+          type: item.type,
+          sortOrder: item.sort_order,
+          isActive: item.is_active,
+        })),
+        scene.id,
+      )
+    : 1;
+  const isChapter = journeyScene?.type === "chapter";
+
+  useEffect(() => {
+    setJourneyScene(scene ? buildJourneyScene(scene, data, effectivePreviewMode) : null);
+    setPreviewMediaUrl(null);
+  }, [data, effectivePreviewMode, scene]);
+
+  useEffect(() => {
+    return () => {
+      if (previewMediaUrl) URL.revokeObjectURL(previewMediaUrl);
+    };
+  }, [previewMediaUrl]);
+
+  function updatePreviewScene(updater: (current: JourneyScene) => JourneyScene) {
+    setJourneyScene((current) => (current ? updater(current) : current));
+  }
+
+  function unlockPreviewReward(rewardKey?: string | null) {
+    if (!rewardKey) return;
+    updatePreviewScene((current) => ({
+      ...current,
+      rewards: current.rewards.map((reward) =>
+        reward.rewardKey === rewardKey
+          ? { ...reward, isUnlocked: true, unlockedAt: new Date().toISOString() }
+          : reward,
+      ),
+    }));
+  }
 
   return (
     <aside className="studio-panel min-h-0 overflow-y-auto p-4">
@@ -1063,58 +1280,76 @@ function ScenePreviewPanel({ data, scene, previewMode, onPreviewModeChange, onRe
           <p className="mt-1 text-xs text-[#fffaf2]/50">390px mobil simülasyon</p>
         </div>
         <button className="studio-button" type="button" onClick={onReplay}>
-          <Eye size={15} /> Animasyonu Yenile
+          <Eye size={15} /> {isChapter ? "Bölüm Jeneriğini Oynat" : "Animasyonu Yenile"}
         </button>
       </div>
-      <select className="studio-input mb-3" value={previewMode} onChange={(event) => onPreviewModeChange(event.target.value as PreviewMode)}>
+      <select className="studio-input mb-3" value={effectivePreviewMode} onChange={(event) => onPreviewModeChange(event.target.value as PreviewMode)}>
         <option value="normal">Normal görünüm</option>
         <option value="locked">Kilitli görünüm</option>
         <option value="unlocked">Kilidi açılmış</option>
-        <option value="task_pending">Görev tamamlanmamış</option>
-        <option value="task_done">Görev tamamlanmış</option>
+        {!isChapter ? <option value="task_pending">Görev tamamlanmamış</option> : null}
+        {!isChapter ? <option value="task_done">Görev tamamlanmış</option> : null}
       </select>
       <div className="mx-auto w-[390px] overflow-hidden rounded-[18px] border border-white/14 bg-[#070814] shadow-[0_24px_90px_rgba(0,0,0,0.42)]">
-        {journeyScene ? (
+        {journeyScene?.type === "chapter" && !journeyScene.isLocked ? (
+          <ChapterRevealScene
+            chapterNumber={chapterNumber}
+            title={journeyScene.title}
+            subtitle={journeyScene.subtitle}
+            direction="forward"
+            allowSkip
+            previewMode={true}
+            onComplete={() => undefined}
+          />
+        ) : journeyScene ? (
           <MobileSceneLayout title={journeyScene.title} subtitle={journeyScene.subtitle ?? undefined} backgroundVariant={journeyScene.backgroundVariant ?? "night"} isLocked={journeyScene.isLocked} progress={{ current: 1, total: 1, states: [journeyScene.isLocked ? "locked" : journeyScene.progressIsCompleted ? "completed" : "unlocked"] }}>
-            <PreviewSceneContent scene={journeyScene} />
+            <JourneySceneRenderer
+              scene={journeyScene}
+              isSubmitting={false}
+              onComplete={() => updatePreviewScene((current) => ({
+                ...current,
+                progressIsCompleted: true,
+                completedAt: new Date().toISOString(),
+              }))}
+              onSubmitPhoto={(file, rewardKey) => {
+                const mediaUrl = URL.createObjectURL(file);
+                setPreviewMediaUrl(mediaUrl);
+                updatePreviewScene((current) => ({
+                  ...current,
+                  progressIsCompleted: true,
+                  completedAt: new Date().toISOString(),
+                  taskResponse: buildStudioPreviewTaskResponse(
+                    "photo",
+                    rewardKey,
+                    { fileName: file.name, fileSize: file.size, mimeType: file.type, previewOnly: true },
+                    mediaUrl,
+                  ),
+                }));
+                unlockPreviewReward(rewardKey);
+              }}
+              onCompleteMiniGame={(params: CompleteMiniGameParams) => {
+                updatePreviewScene((current) => ({
+                  ...current,
+                  progressIsCompleted: true,
+                  completedAt: new Date().toISOString(),
+                  taskResponse: buildStudioPreviewTaskResponse(
+                    "mini_game",
+                    params.rewardKey,
+                    { ...params.payload, gameKey: params.gameKey ?? "primary", previewOnly: true },
+                    null,
+                    params.score,
+                  ),
+                }));
+                unlockPreviewReward(params.rewardKey);
+              }}
+              onUnlockReward={(rewardKey) => unlockPreviewReward(rewardKey)}
+            />
           </MobileSceneLayout>
         ) : (
           <div className="p-6 text-sm text-[#fffaf2]/60">Sahne seç.</div>
         )}
       </div>
     </aside>
-  );
-}
-
-function PreviewSceneContent({ scene }: { scene: JourneyScene }) {
-  if (scene.isLocked) {
-    return <LockedRevealCard title={scene.title} isRevealed={false} unlockCondition={scene.unlockCondition} />;
-  }
-  if (scene.type === "memory") {
-    return <MemoryCard imageUrl={scene.imageUrl} dateLabel={scene.dateLabel} title={scene.title} content={scene.content} />;
-  }
-  if (scene.type === "task") {
-    if (scene.miniGame) {
-      return <MiniGameCard scene={scene} isSubmitting={false} onComplete={() => undefined} />;
-    }
-    return (
-      <div className="w-full space-y-3">
-        <TaskCard title={scene.content ?? scene.title} isCompleted={scene.progressIsCompleted} onComplete={() => undefined} />
-        <RewardRevealStack rewards={scene.rewards} isBusy={false} onUnlock={() => undefined} />
-      </div>
-    );
-  }
-  return (
-    <div className="w-full space-y-3">
-      <PremiumCard className="w-full p-6">
-        <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 text-[#f4dcc0]">
-          <Gift size={21} strokeWidth={1.6} />
-        </div>
-        {scene.dateLabel ? <p className="mb-3 text-xs font-medium uppercase tracking-[0.18em] text-[#f4dcc0]/78">{scene.dateLabel}</p> : null}
-        <p className="text-2xl font-semibold leading-tight text-[#fffaf2]">{scene.content}</p>
-      </PremiumCard>
-      <JourneyContentBlocks blocks={scene.contentBlocks} />
-    </div>
   );
 }
 
@@ -1242,6 +1477,28 @@ function mapMiniGame(game: StudioMiniGame): JourneyMiniGame {
 function buildCompletedTaskResponse(): JourneyTaskResponse {
   const now = new Date().toISOString();
   return { id: "preview", responseKey: "primary", type: "generic", status: "completed", payload: {}, completedAt: now, updatedAt: now };
+}
+
+function buildStudioPreviewTaskResponse(
+  type: JourneyTaskResponse["type"],
+  rewardKey: string | null | undefined,
+  payload: Record<string, unknown>,
+  mediaUrl: string | null,
+  score?: number | null,
+): JourneyTaskResponse {
+  const now = new Date().toISOString();
+  return {
+    id: `studio-preview-${crypto.randomUUID()}`,
+    responseKey: "primary",
+    type,
+    status: "completed",
+    mediaUrl,
+    score: score ?? null,
+    rewardKey,
+    payload,
+    completedAt: now,
+    updatedAt: now,
+  };
 }
 
 function hasRequiredMediaGap(scene: StudioScene, requirements: StudioMediaRequirement[]) {

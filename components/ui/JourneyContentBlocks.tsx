@@ -1,6 +1,6 @@
 "use client";
 
-import { Quote, Video } from "lucide-react";
+import { AlertTriangle, Music2, Quote, Video } from "lucide-react";
 import type { JourneyContentBlock } from "@/lib/journey/types";
 import { PremiumCard } from "./PremiumCard";
 
@@ -29,6 +29,10 @@ export function JourneyContentBlocks({ blocks }: { blocks: JourneyContentBlock[]
           );
         }
 
+        if (block.type === "image") {
+          return <ContentBlockNotice key={block.id} title={block.title} message="Görsel blok için medya URL'si eksik." />;
+        }
+
         if (block.type === "video" && block.mediaUrl) {
           return (
             <PremiumCard key={block.id} className="w-full p-3">
@@ -42,6 +46,25 @@ export function JourneyContentBlocks({ blocks }: { blocks: JourneyContentBlock[]
               </div>
             </PremiumCard>
           );
+        }
+
+        if (block.type === "video") {
+          return <ContentBlockNotice key={block.id} title={block.title} message="Video blok için medya URL'si eksik." />;
+        }
+
+        if (block.type === "audio" && block.mediaUrl) {
+          return (
+            <PremiumCard key={block.id} className="w-full p-5">
+              <Music2 className="mb-4 text-[#f4dcc0]" size={20} strokeWidth={1.6} />
+              {block.title ? <p className="text-lg font-semibold text-[#fffaf2]">{block.title}</p> : null}
+              {block.body ? <p className="mt-2 text-sm leading-6 text-[#fffaf2]/68">{block.body}</p> : null}
+              <audio className="mt-4 w-full" controls preload="metadata" src={block.mediaUrl} />
+            </PremiumCard>
+          );
+        }
+
+        if (block.type === "audio") {
+          return <ContentBlockNotice key={block.id} title={block.title} message="Ses blok için medya URL'si eksik." />;
         }
 
         if (block.type === "quote") {
@@ -63,8 +86,28 @@ export function JourneyContentBlocks({ blocks }: { blocks: JourneyContentBlock[]
           );
         }
 
-        return null;
+        if (block.type === "reward" || block.type === "game" || block.type === "photo_task") {
+          return (
+            <ContentBlockNotice
+              key={block.id}
+              title={block.title}
+              message={`${block.type} bloğu bu sahnede bağımsız içerik olarak gösterilemiyor. İlgili task, mini oyun veya reward ilişkisini kontrol et.`}
+            />
+          );
+        }
+
+        return <ContentBlockNotice key={block.id} title={block.title} message="Desteklenmeyen içerik bloğu." />;
       })}
     </div>
+  );
+}
+
+function ContentBlockNotice({ title, message }: { title?: string | null; message: string }) {
+  return (
+    <PremiumCard className="w-full border-[#f0b7c6]/16 p-5">
+      <AlertTriangle className="mb-3 text-[#f0b7c6]/78" size={19} strokeWidth={1.6} />
+      {title ? <p className="text-base font-semibold text-[#fffaf2]">{title}</p> : null}
+      <p className="mt-2 text-sm leading-6 text-[#fffaf2]/60">{message}</p>
+    </PremiumCard>
   );
 }

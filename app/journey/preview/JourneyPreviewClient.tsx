@@ -1,27 +1,18 @@
 "use client";
 
-import { Check, Eye, Gift, Heart, RotateCcw, Sparkles } from "lucide-react";
+import { Eye, RotateCcw } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MobileSceneLayout } from "@/components/layout/MobileSceneLayout";
-import { JourneyContentBlocks } from "@/components/ui/JourneyContentBlocks";
-import { MemoryCard } from "@/components/ui/MemoryCard";
-import { MiniGameCard } from "@/components/ui/MiniGameCard";
-import { PhotoTaskCard } from "@/components/ui/PhotoTaskCard";
+import { ChapterRevealScene } from "@/components/scene/ChapterRevealScene";
+import { JourneySceneRenderer, type CompleteMiniGameParams } from "@/components/scene/JourneySceneRenderer";
 import { PremiumCard } from "@/components/ui/PremiumCard";
 import { PrimaryActionButton } from "@/components/ui/PrimaryActionButton";
-import { RewardRevealStack } from "@/components/ui/RewardRevealStack";
-import { TaskCard } from "@/components/ui/TaskCard";
 import { startEmotionalSoundtrack } from "@/lib/audio/emotionalSoundtrack";
+import { getChapterNumber, getNextSceneAfter, getProgressScenes } from "@/lib/journey/chapters";
+import { canNavigateForward } from "@/lib/journey/progress";
 import { getJourneyPreviewScenes } from "@/lib/journey/queries";
 import type { JourneyReward, JourneyScene, JourneyTaskResponse } from "@/lib/journey/types";
-
-type CompleteMiniGameParams = {
-  gameKey?: string;
-  score?: number | null;
-  rewardKey?: string | null;
-  payload?: Record<string, unknown>;
-};
 
 export function JourneyPreviewClient({
   code,
@@ -38,6 +29,8 @@ export function JourneyPreviewClient({
   const [isBusy, setIsBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastCompletedSlug, setLastCompletedSlug] = useState<string | null>(null);
+  const [chapterReplayKey, setChapterReplayKey] = useState(0);
+  const previewObjectUrlsRef = useRef<string[]>([]);
 
   const currentScene = scenes[currentSceneIndex] ?? null;
 
@@ -93,6 +86,12 @@ export function JourneyPreviewClient({
     };
   }, [code, rpcPreviewToken]);
 
+  useEffect(() => {
+    return () => {
+      previewObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, []);
+
   const summary = useMemo(() => {
     const gameCount = scenes.filter((scene) => scene.miniGame).length;
     return scenes.length > 0
@@ -100,20 +99,41 @@ export function JourneyPreviewClient({
       : "Tüm kilitli sahneler preview için hazırlanıyor.";
   }, [scenes]);
 
-  const canNavigateNext = currentSceneIndex < scenes.length - 1;
+  const canNavigateNext = Boolean(
+    currentScene && currentSceneIndex < scenes.length - 1 && canNavigateForward(currentScene),
+  );
   const canNavigatePrevious = currentSceneIndex > 0;
-  const progressStates = scenes.map((scene) => (scene.progressIsCompleted ? "completed" : "unlocked"));
+  const progressScenes = getProgressScenes(scenes);
+  const progressIndex = currentScene
+    ? progressScenes.findIndex((scene) => scene.id === currentScene.id)
+    : -1;
+  const progressStates = progressScenes.map((scene) => (scene.progressIsCompleted ? "completed" : "unlocked"));
 
   const goNext = useCallback(() => {
+    if (!currentScene || !canNavigateForward(currentScene)) {
+      return;
+    }
+
     startEmotionalSoundtrack();
     setDirection("forward");
     setCurrentSceneIndex((index) => Math.min(index + 1, Math.max(scenes.length - 1, 0)));
-  }, [scenes.length]);
+  }, [currentScene, scenes.length]);
 
   const goPrevious = useCallback(() => {
     setDirection("backward");
     setCurrentSceneIndex((index) => Math.max(index - 1, 0));
   }, []);
+
+  const goToScene = useCallback(
+    (nextIndex: number) => {
+      const boundedIndex = Math.max(0, Math.min(nextIndex, Math.max(scenes.length - 1, 0)));
+      setDirection(boundedIndex >= currentSceneIndex ? "forward" : "backward");
+      setCurrentSceneIndex(boundedIndex);
+      setLastCompletedSlug(null);
+      setChapterReplayKey((key) => key + 1);
+    },
+    [currentSceneIndex, scenes.length],
+  );
 
   const updateScene = useCallback((sceneSlug: string, updater: (scene: JourneyScene) => JourneyScene) => {
     setScenes((currentScenes) => currentScenes.map((scene) => (scene.slug === sceneSlug ? updater(scene) : scene)));
@@ -136,6 +156,7 @@ export function JourneyPreviewClient({
   const submitPhotoLocally = useCallback(
     (sceneSlug: string, file: File, rewardKey?: string | null) => {
       const mediaUrl = URL.createObjectURL(file);
+      previewObjectUrlsRef.current.push(mediaUrl);
       updateScene(sceneSlug, (scene) => ({
         ...scene,
         progressIsCompleted: true,
@@ -206,7 +227,7 @@ export function JourneyPreviewClient({
 
   if (error) {
     return (
-      <MobileSceneLayout title="Preview açılamadı" subtitle="Kilitli içerik test endpoint'i hazır değil." backgroundVariant="deep">
+      <MobileSceneLayout title="Preview açılamadı" subtitle="Kilitli içerik preview endpoint'i hazır değil." backgroundVariant="deep">
         <PremiumCard className="w-full p-6">
           <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 text-[#f4dcc0]">
             <RotateCcw size={21} strokeWidth={1.6} />
@@ -233,13 +254,44 @@ export function JourneyPreviewClient({
     );
   }
 
+  if (currentScene.type === "chapter") {
+    return (
+      <div className="relative min-h-[100dvh] bg-[#020203]">
+        <ChapterRevealScene
+          key={`${currentScene.id}-${currentSceneIndex}-${chapterReplayKey}`}
+          chapterNumber={getChapterNumber(scenes, currentScene.id)}
+          title={currentScene.title}
+          subtitle={currentScene.subtitle}
+          direction={direction}
+          allowSkip
+          previewMode
+          onComplete={() => {
+            if (getNextSceneAfter(scenes, currentScene.id)) goNext();
+          }}
+        />
+        <button
+          className="absolute right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-20 rounded-full border border-white/10 bg-black/35 px-3 py-2 text-[0.65rem] uppercase tracking-[0.14em] text-[#efe5d6]/60 backdrop-blur"
+          type="button"
+          onPointerUp={(event) => event.stopPropagation()}
+          onClick={() => setChapterReplayKey((key) => key + 1)}
+        >
+          Yeniden oynat
+        </button>
+      </div>
+    );
+  }
+
   return (
     <MobileSceneLayout
       title={currentScene.title}
-      subtitle={currentScene.subtitle ?? summary}
+      subtitle={currentScene.subtitle ?? undefined}
       previousAction={canNavigatePrevious ? goPrevious : undefined}
       nextAction={canNavigateNext ? goNext : undefined}
-      progress={{ current: currentSceneIndex + 1, total: scenes.length, states: progressStates }}
+      progress={
+        progressIndex >= 0
+          ? { current: progressIndex + 1, total: progressScenes.length, states: progressStates }
+          : undefined
+      }
       showSideArrows
       animationDirection={direction}
       backgroundVariant={currentScene.backgroundVariant ?? "deep"}
@@ -258,10 +310,26 @@ export function JourneyPreviewClient({
             <div className="min-w-0">
               <p className="text-sm font-semibold text-[#fffaf2]">Preview modu</p>
               <p className="mt-1 text-xs leading-5 text-[#fffaf2]/56">
-                Bu ekranda tüm sahneler açık ve görev sonuçları sadece local test için işlenir.
+                Bu ekranda tüm sahneler açık ve görev sonuçları yalnızca yerel önizleme için işlenir.
               </p>
             </div>
           </div>
+          <label className="mt-4 block">
+            <span className="mb-2 block text-[0.65rem] font-medium uppercase tracking-[0.14em] text-[#f4dcc0]/58">
+              Sahneye hızlı geç
+            </span>
+            <select
+              className="min-h-11 w-full rounded-[8px] border border-white/10 bg-[#080a16] px-3 text-sm text-[#fffaf2]/82 outline-none"
+              value={currentSceneIndex}
+              onChange={(event) => goToScene(Number(event.target.value))}
+            >
+              {scenes.map((scene, index) => (
+                <option key={scene.id} value={index}>
+                  {index + 1}. {scene.title}
+                </option>
+              ))}
+            </select>
+          </label>
         </PremiumCard>
 
         {lastCompletedSlug && lastCompletedSlug === currentScene.slug ? (
@@ -275,7 +343,7 @@ export function JourneyPreviewClient({
           </motion.div>
         ) : null}
 
-        <PreviewSceneContent
+        <JourneySceneRenderer
           scene={currentScene}
           isSubmitting={isBusy}
           onComplete={() => completeSceneLocally(currentScene.slug)}
@@ -285,86 +353,6 @@ export function JourneyPreviewClient({
         />
       </div>
     </MobileSceneLayout>
-  );
-}
-
-function PreviewSceneContent({
-  scene,
-  isSubmitting,
-  onComplete,
-  onSubmitPhoto,
-  onCompleteMiniGame,
-  onUnlockReward,
-}: {
-  scene: JourneyScene;
-  isSubmitting: boolean;
-  onComplete: () => void;
-  onSubmitPhoto: (file: File, rewardKey?: string | null) => void;
-  onCompleteMiniGame: (params: CompleteMiniGameParams) => void;
-  onUnlockReward: (rewardKey: string) => void;
-}) {
-  if (scene.type === "task") {
-    if (scene.miniGame) {
-      return (
-        <TaskExperience>
-          <MiniGameCard scene={scene} isSubmitting={isSubmitting} onComplete={onCompleteMiniGame} />
-          <RewardRevealStack rewards={scene.rewards} isBusy={isSubmitting} onUnlock={onUnlockReward} />
-        </TaskExperience>
-      );
-    }
-
-    if (scene.contentBlocks.some((block) => block.type === "photo_task") || scene.taskResponse?.type === "photo") {
-      return (
-        <TaskExperience>
-          <PhotoTaskCard scene={scene} isSubmitting={isSubmitting} onSubmit={onSubmitPhoto} />
-          <RewardRevealStack rewards={scene.rewards} isBusy={isSubmitting} onUnlock={onUnlockReward} />
-        </TaskExperience>
-      );
-    }
-
-    return (
-      <TaskExperience>
-        <TaskCard
-          title={scene.content ?? scene.title}
-          isCompleted={scene.progressIsCompleted}
-          isSubmitting={isSubmitting}
-          onComplete={onComplete}
-        />
-        <RewardRevealStack rewards={scene.rewards} isBusy={isSubmitting} onUnlock={onUnlockReward} />
-      </TaskExperience>
-    );
-  }
-
-  if (scene.type === "memory") {
-    return (
-      <div className="w-full space-y-3">
-        <MemoryCard imageUrl={scene.imageUrl} dateLabel={scene.dateLabel} title={scene.title} content={scene.content} />
-        <JourneyContentBlocks blocks={scene.contentBlocks} />
-      </div>
-    );
-  }
-
-  const icon = scene.type === "welcome" ? Sparkles : scene.slug.includes("anniversary") ? Heart : Gift;
-
-  return (
-    <div className="w-full space-y-3">
-      <PremiumCard className="w-full p-6">
-        <div className="mb-6 flex h-12 w-12 items-center justify-center rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 text-[#f4dcc0]">
-          {icon === Heart ? <Heart size={21} strokeWidth={1.6} /> : icon === Gift ? <Gift size={21} strokeWidth={1.6} /> : <Sparkles size={21} strokeWidth={1.6} />}
-        </div>
-        {scene.dateLabel ? (
-          <p className="mb-3 text-xs font-medium uppercase tracking-[0.18em] text-[#f4dcc0]/78">{scene.dateLabel}</p>
-        ) : null}
-        <p className="text-2xl font-semibold leading-tight text-[#fffaf2]">{scene.content}</p>
-        {scene.progressIsCompleted ? (
-          <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 px-3 py-2 text-sm text-[#f4dcc0]">
-            <Check size={16} strokeWidth={1.8} />
-            Tamamlandı
-          </div>
-        ) : null}
-      </PremiumCard>
-      <JourneyContentBlocks blocks={scene.contentBlocks} />
-    </div>
   );
 }
 
@@ -444,17 +432,7 @@ function buildPreviewTaskResponse(
 }
 
 function findFirstPlayableIndex(scenes: JourneyScene[]) {
-  const firstMiniGameIndex = scenes.findIndex((scene) => scene.miniGame);
-  if (firstMiniGameIndex >= 0) {
-    return firstMiniGameIndex;
-  }
-
-  const firstTaskIndex = scenes.findIndex((scene) => scene.type === "task");
-  return firstTaskIndex >= 0 ? firstTaskIndex : 0;
-}
-
-function TaskExperience({ children }: { children: ReactNode }) {
-  return <div className="w-full space-y-3">{children}</div>;
+  return scenes.length > 0 ? 0 : -1;
 }
 
 function getErrorMessage(error: unknown) {

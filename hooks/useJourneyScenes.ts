@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   claimJourneyReward,
   completeJourneyScene,
@@ -10,7 +10,7 @@ import {
   saveJourneyTaskResponse,
   uploadJourneyTaskPhoto,
 } from "@/lib/journey/queries";
-import { isSceneOpen, resolveInitialSceneIndex } from "@/lib/journey/progress";
+import { canNavigateForward, resolveInitialSceneIndex } from "@/lib/journey/progress";
 import type { JourneyScene } from "@/lib/journey/types";
 
 export const JOURNEY_ACCESS_CODE_KEY = "romanticJourney.accessCode";
@@ -33,6 +33,8 @@ export function useJourneyScenes() {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastCompletedSlug, setLastCompletedSlug] = useState<string | null>(null);
+  const completionMutationKeysRef = useRef(new Set<string>());
+  const photoMutationKeysRef = useRef(new Set<string>());
 
   const currentScene = scenes[currentSceneIndex] ?? null;
 
@@ -109,9 +111,13 @@ export function useJourneyScenes() {
   }, [currentScene]);
 
   const goNext = useCallback(() => {
+    if (!currentScene || !canNavigateForward(currentScene)) {
+      return;
+    }
+
     setDirection("forward");
     setCurrentSceneIndex((index) => Math.min(index + 1, Math.max(scenes.length - 1, 0)));
-  }, [scenes.length]);
+  }, [currentScene, scenes.length]);
 
   const goPrevious = useCallback(() => {
     setDirection("backward");
@@ -120,30 +126,42 @@ export function useJourneyScenes() {
 
   const goToScene = useCallback(
     (nextIndex: number) => {
+      const boundedIndex = Math.max(0, Math.min(nextIndex, Math.max(scenes.length - 1, 0)));
+      if (
+        boundedIndex > currentSceneIndex &&
+        scenes.slice(currentSceneIndex, boundedIndex).some((scene) => !canNavigateForward(scene))
+      ) {
+        return;
+      }
+
       setDirection(nextIndex >= currentSceneIndex ? "forward" : "backward");
-      setCurrentSceneIndex(Math.max(0, Math.min(nextIndex, Math.max(scenes.length - 1, 0))));
+      setCurrentSceneIndex(boundedIndex);
     },
-    [currentSceneIndex, scenes.length],
+    [currentSceneIndex, scenes],
   );
 
   const completeScene = useCallback(
     async (sceneSlug: string) => {
-      setIsCompleting(true);
+      const mutationKey = `${accessCode}:complete:${sceneSlug}`;
+      if (!beginMutation(completionMutationKeysRef, mutationKey, setIsCompleting)) {
+        return;
+      }
+
       setError(null);
 
       try {
         await completeJourneyScene({ code: accessCode, sceneSlug });
         const nextScenes = await getJourneyScenes(accessCode);
         const completedIndex = nextScenes.findIndex((scene) => scene.slug === sceneSlug);
-        const nextOpenIndex = findNextOpenSceneIndex(nextScenes, completedIndex);
-        const nextSceneSlug = nextOpenIndex >= 0 ? nextScenes[nextOpenIndex]?.slug : sceneSlug;
+        const nextIndex = completedIndex >= 0 && completedIndex < nextScenes.length - 1 ? completedIndex + 1 : -1;
+        const nextSceneSlug = nextIndex >= 0 ? nextScenes[nextIndex]?.slug : sceneSlug;
 
         setScenes(nextScenes);
         setLastCompletedSlug(sceneSlug);
 
-        if (nextOpenIndex >= 0 && nextOpenIndex !== completedIndex) {
+        if (nextIndex >= 0) {
           setDirection("forward");
-          setCurrentSceneIndex(nextOpenIndex);
+          setCurrentSceneIndex(nextIndex);
         } else {
           setCurrentSceneIndex(resolveInitialSceneIndex(nextScenes, sceneSlug));
         }
@@ -155,7 +173,7 @@ export function useJourneyScenes() {
       } catch (caughtError) {
         setError(getErrorMessage(caughtError));
       } finally {
-        setIsCompleting(false);
+        endMutation(completionMutationKeysRef, mutationKey, setIsCompleting);
       }
     },
     [accessCode],
@@ -163,7 +181,11 @@ export function useJourneyScenes() {
 
   const submitPhotoTask = useCallback(
     async (sceneSlug: string, file: File, rewardKey?: string | null) => {
-      setIsUploading(true);
+      const mutationKey = `${accessCode}:photo:${sceneSlug}`;
+      if (!beginMutation(photoMutationKeysRef, mutationKey, setIsUploading)) {
+        return;
+      }
+
       setError(null);
 
       try {
@@ -174,7 +196,7 @@ export function useJourneyScenes() {
       } catch (caughtError) {
         setError(getErrorMessage(caughtError));
       } finally {
-        setIsUploading(false);
+        endMutation(photoMutationKeysRef, mutationKey, setIsUploading);
       }
     },
     [accessCode, refreshScenes],
@@ -194,7 +216,11 @@ export function useJourneyScenes() {
       rewardKey?: string | null;
       payload?: Record<string, unknown>;
     }) => {
-      setIsCompleting(true);
+      const mutationKey = `${accessCode}:mini-game:${sceneSlug}:${gameKey}`;
+      if (!beginMutation(completionMutationKeysRef, mutationKey, setIsCompleting)) {
+        return;
+      }
+
       setError(null);
 
       try {
@@ -213,7 +239,7 @@ export function useJourneyScenes() {
       } catch (caughtError) {
         setError(getErrorMessage(caughtError));
       } finally {
-        setIsCompleting(false);
+        endMutation(completionMutationKeysRef, mutationKey, setIsCompleting);
       }
     },
     [accessCode, refreshScenes],
@@ -221,7 +247,11 @@ export function useJourneyScenes() {
 
   const unlockReward = useCallback(
     async (sceneSlug: string, rewardKey: string) => {
-      setIsCompleting(true);
+      const mutationKey = `${accessCode}:reward:${sceneSlug}:${rewardKey}`;
+      if (!beginMutation(completionMutationKeysRef, mutationKey, setIsCompleting)) {
+        return;
+      }
+
       setError(null);
 
       try {
@@ -230,7 +260,7 @@ export function useJourneyScenes() {
       } catch (caughtError) {
         setError(getErrorMessage(caughtError));
       } finally {
-        setIsCompleting(false);
+        endMutation(completionMutationKeysRef, mutationKey, setIsCompleting);
       }
     },
     [accessCode, refreshScenes],
@@ -285,18 +315,27 @@ export function useJourneyScenes() {
   return value;
 }
 
-function findNextOpenSceneIndex(scenes: JourneyScene[], fromIndex: number) {
-  if (fromIndex < 0) {
-    return -1;
+function beginMutation(
+  ref: { current: Set<string> },
+  key: string,
+  setBusy: (busy: boolean) => void,
+) {
+  if (ref.current.has(key)) {
+    return false;
   }
 
-  for (let index = fromIndex + 1; index < scenes.length; index += 1) {
-    if (isSceneOpen(scenes[index])) {
-      return index;
-    }
-  }
+  ref.current.add(key);
+  setBusy(true);
+  return true;
+}
 
-  return -1;
+function endMutation(
+  ref: { current: Set<string> },
+  key: string,
+  setBusy: (busy: boolean) => void,
+) {
+  ref.current.delete(key);
+  setBusy(ref.current.size > 0);
 }
 
 function readStorage(key: string) {

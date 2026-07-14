@@ -7,6 +7,7 @@ import { AnimatedPageTransition } from "@/components/scene/AnimatedPageTransitio
 import { BottomNavigationControls, type SceneAction } from "@/components/scene/BottomNavigationControls";
 import { ProgressDots, type ProgressDotState } from "@/components/scene/ProgressDots";
 import { SideArrowNavigation } from "@/components/scene/SideArrowNavigation";
+import { SoundControlButton } from "@/components/audio/SoundControlButton";
 import type { BackgroundVariant } from "@/lib/journey/types";
 import { cn } from "@/lib/utils";
 
@@ -26,6 +27,7 @@ export type MobileSceneLayoutProps = {
   isLocked?: boolean;
   animationDirection?: "forward" | "backward";
   backgroundVariant?: BackgroundVariant;
+  showSoundControl?: boolean;
 };
 
 export function MobileSceneLayout({
@@ -40,15 +42,17 @@ export function MobileSceneLayout({
   isLocked = false,
   animationDirection = "forward",
   backgroundVariant = "night",
+  showSoundControl = false,
 }: MobileSceneLayoutProps) {
   return (
     <main className="relative min-h-[100dvh] overflow-x-hidden bg-[#070814] text-[#fffaf2]">
       <SoftGradientBackground variant={backgroundVariant} />
       <FloatingParticles />
+      {showSoundControl ? <SoundControlButton /> : null}
 
       <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-[430px] flex-col px-5 pt-[max(1.75rem,calc(env(safe-area-inset-top)+1rem))]">
         <section className="flex min-h-0 flex-1 flex-col">
-          <header className="shrink-0 pb-4 pt-2">
+          <header className={cn("shrink-0 pb-4 pt-2", showSoundControl && "pr-12")}>
             {progress ? (
               <div className="mb-5">
                 <ProgressDots current={progress.current} total={progress.total} states={progress.states} />

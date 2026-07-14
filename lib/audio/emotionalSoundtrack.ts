@@ -6,6 +6,7 @@ type SoundtrackState = {
   intervalId?: number;
   nextChordIndex: number;
   started: boolean;
+  muted: boolean;
 };
 
 type AudioWindow = Window &
@@ -22,6 +23,7 @@ const chordProgression = [
 ];
 
 const melodyNotes = [659.25, 587.33, 523.25, 493.88, 440, 523.25];
+const SOUNDTRACK_EVENT = "emotional-soundtrack-change";
 
 export function startEmotionalSoundtrack() {
   if (typeof window === "undefined") return;
@@ -32,10 +34,12 @@ export function startEmotionalSoundtrack() {
     (audioWindow.__emotionalSoundtrack = {
       nextChordIndex: 0,
       started: false,
+      muted: false,
     });
 
   if (state.started) {
     void state.audioContext?.resume();
+    emitSoundtrackChange();
     return;
   }
 
@@ -53,19 +57,53 @@ export function startEmotionalSoundtrack() {
   state.audioContext = audioContext;
   state.masterGain = masterGain;
   state.started = true;
+  state.muted = Boolean(state.muted);
 
   void audioContext.resume();
 
   const now = audioContext.currentTime;
   masterGain.gain.cancelScheduledValues(now);
   masterGain.gain.setValueAtTime(Math.max(masterGain.gain.value, 0.0001), now);
-  masterGain.gain.linearRampToValueAtTime(0.11, now + 1.8);
+  masterGain.gain.linearRampToValueAtTime(state.muted ? 0.0001 : 0.11, now + 1.8);
 
   scheduleChord(state, now + 0.04);
   state.intervalId = window.setInterval(() => {
     if (!state.audioContext) return;
     scheduleChord(state, state.audioContext.currentTime + 0.04);
   }, 4200);
+  emitSoundtrackChange();
+}
+
+export function getEmotionalSoundtrackState() {
+  if (typeof window === "undefined") return { started: false, muted: false };
+  const state = (window as AudioWindow).__emotionalSoundtrack;
+  return { started: Boolean(state?.started), muted: Boolean(state?.muted) };
+}
+
+export function setEmotionalSoundtrackMuted(muted: boolean) {
+  if (typeof window === "undefined") return;
+  const state = (window as AudioWindow).__emotionalSoundtrack;
+  if (!state) return;
+
+  state.muted = muted;
+  if (state.audioContext && state.masterGain) {
+    const now = state.audioContext.currentTime;
+    state.masterGain.gain.cancelScheduledValues(now);
+    state.masterGain.gain.setValueAtTime(Math.max(state.masterGain.gain.value, 0.0001), now);
+    state.masterGain.gain.linearRampToValueAtTime(muted ? 0.0001 : 0.11, now + 0.45);
+    if (!muted) void state.audioContext.resume();
+  }
+  emitSoundtrackChange();
+}
+
+export function subscribeToEmotionalSoundtrack(listener: () => void) {
+  if (typeof window === "undefined") return () => undefined;
+  window.addEventListener(SOUNDTRACK_EVENT, listener);
+  return () => window.removeEventListener(SOUNDTRACK_EVENT, listener);
+}
+
+function emitSoundtrackChange() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(SOUNDTRACK_EVENT));
 }
 
 function scheduleChord(state: SoundtrackState, startsAt: number) {
