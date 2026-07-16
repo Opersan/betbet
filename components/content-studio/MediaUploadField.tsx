@@ -2,10 +2,10 @@
 
 import { RotateCcw, Upload } from "lucide-react";
 import { useRef, useState } from "react";
+import { PositionedImage } from "@/components/ui/PositionedImage";
 import { uploadJourneyContentFile } from "@/lib/content-studio/storage";
 import {
   defaultImagePlacement,
-  imagePlacementStyle,
   readImagePlacement,
   writeImagePlacement,
   type ImagePlacement,
@@ -97,7 +97,7 @@ function ImagePlacementEditor({
   placement: ImagePlacement;
   onChange: (placement: ImagePlacement) => void;
 }) {
-  function update(key: keyof ImagePlacement, rawValue: string) {
+  function update(key: "x" | "y" | "zoom", rawValue: string) {
     const nextValue = Number(rawValue);
     if (!Number.isFinite(nextValue)) return;
     onChange({ ...placement, [key]: nextValue });
@@ -107,20 +107,28 @@ function ImagePlacementEditor({
     <div className="mt-3 border-t border-white/10 pt-3">
       <div className="grid grid-cols-[112px_1fr] gap-3">
         <div className="relative aspect-[4/5] overflow-hidden rounded-[8px] border border-white/10 bg-[#050711]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            className="absolute inset-0 h-full w-full object-cover"
-            src={src}
+          <PositionedImage
+            value={writeImagePlacement(src, placement)}
             alt="Görsel yerleşimi önizlemesi"
-            style={imagePlacementStyle(writeImagePlacement(src, placement))}
           />
         </div>
         <div className="grid content-start grid-cols-3 gap-2">
+          <label className="col-span-3">
+            <span className="mb-1 block text-[10px] font-semibold text-[#f4dcc0]/66">Görünüm</span>
+            <select
+              className="studio-input px-2 py-1.5 text-xs"
+              value={placement.mode}
+              onChange={(event) => onChange({ ...placement, mode: event.target.value === "contain" ? "contain" : "cover" })}
+            >
+              <option value="cover">Kadrajı doldur</option>
+              <option value="contain">Fotoğrafın tamamını sığdır</option>
+            </select>
+          </label>
           <PlacementNumberField label="X" value={placement.x} min={-50} max={50} onChange={(value) => update("x", value)} />
           <PlacementNumberField label="Y" value={placement.y} min={-50} max={50} onChange={(value) => update("y", value)} />
           <PlacementNumberField label="Zoom (%)" value={placement.zoom} min={100} max={250} onChange={(value) => update("zoom", value)} />
           <p className="col-span-3 text-[11px] leading-4 text-[#fffaf2]/48">
-            +X sağ tarafı, +Y alt tarafı gösterir. %100 çerçeveyi boşluksuz dolduran minimum zoom seviyesidir.
+            Sığdır seçeneği yatay fotoğrafın tamamını gösterir; kalan alan aynı fotoğrafın bulanık kopyasıyla doldurulur. +X sağ, +Y alt tarafı odaklar.
           </p>
           <button
             className="studio-mini-button col-span-3 justify-self-start"

@@ -2,7 +2,7 @@
 
 import { AlertTriangle, Music2, Quote, Video } from "lucide-react";
 import type { JourneyContentBlock } from "@/lib/journey/types";
-import { imagePlacementStyle, readImagePlacement } from "@/lib/media/image-placement";
+import { PositionedImage } from "./PositionedImage";
 import { PremiumCard } from "./PremiumCard";
 
 export function JourneyContentBlocks({ blocks }: { blocks: JourneyContentBlock[] }) {
@@ -21,12 +21,9 @@ export function JourneyContentBlocks({ blocks }: { blocks: JourneyContentBlock[]
           return (
             <PremiumCard key={block.id} className="w-full p-3">
               <div className="relative aspect-[4/5] overflow-hidden rounded-[8px] border border-white/10 bg-black/24">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  className="absolute inset-0 h-full w-full object-cover"
-                  src={readImagePlacement(block.mediaUrl).src}
+                <PositionedImage
+                  value={block.mediaUrl}
                   alt={block.altText ?? block.title ?? ""}
-                  style={imagePlacementStyle(block.mediaUrl)}
                 />
               </div>
               {block.title ? <p className="px-2 pt-4 text-lg font-semibold text-[#fffaf2]">{block.title}</p> : null}

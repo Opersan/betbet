@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Camera } from "lucide-react";
-import { imagePlacementStyle, readImagePlacement } from "@/lib/media/image-placement";
+import { PositionedImage } from "./PositionedImage";
 import { PremiumCard } from "./PremiumCard";
 
 export function MemoryCard({
@@ -18,19 +18,15 @@ export function MemoryCard({
 }) {
   const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
   const showImage = Boolean(imageUrl && failedImageUrl !== imageUrl);
-  const imageSource = readImagePlacement(imageUrl).src;
 
   return (
     <PremiumCard className="w-full p-4">
       <div className="relative aspect-[4/5] max-h-[min(48dvh,22rem)] w-full overflow-hidden rounded-[8px] border border-white/10 bg-white/[0.06]">
         {showImage ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            className="absolute inset-0 h-full w-full object-cover"
-            src={imageSource || undefined}
+          <PositionedImage
+            value={imageUrl}
             alt={title}
             loading="lazy"
-            style={imagePlacementStyle(imageUrl)}
             onError={() => setFailedImageUrl(imageUrl ?? null)}
           />
         ) : (

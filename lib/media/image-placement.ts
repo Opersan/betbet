@@ -4,12 +4,14 @@ export type ImagePlacement = {
   x: number;
   y: number;
   zoom: number;
+  mode: "cover" | "contain";
 };
 
 export const defaultImagePlacement: ImagePlacement = {
   x: 0,
   y: 0,
   zoom: 100,
+  mode: "cover",
 };
 
 const placementMarker = "#bet-placement=";
@@ -26,7 +28,7 @@ export function readImagePlacement(value: string | null | undefined): {
   }
 
   const src = source.slice(0, markerIndex);
-  const [rawX, rawY, rawZoom] = source.slice(markerIndex + placementMarker.length).split(",");
+  const [rawX, rawY, rawZoom, rawMode] = source.slice(markerIndex + placementMarker.length).split(",");
 
   return {
     src,
@@ -34,6 +36,7 @@ export function readImagePlacement(value: string | null | undefined): {
       x: finiteNumber(rawX, defaultImagePlacement.x),
       y: finiteNumber(rawY, defaultImagePlacement.y),
       zoom: finiteNumber(rawZoom, defaultImagePlacement.zoom),
+      mode: rawMode === "contain" ? "contain" : "cover",
     }),
   };
 }
@@ -49,11 +52,12 @@ export function writeImagePlacement(
     normalized.x === defaultImagePlacement.x
     && normalized.y === defaultImagePlacement.y
     && normalized.zoom === defaultImagePlacement.zoom
+    && normalized.mode === defaultImagePlacement.mode
   ) {
     return src;
   }
 
-  return `${src}${placementMarker}${normalized.x},${normalized.y},${normalized.zoom}`;
+  return `${src}${placementMarker}${normalized.x},${normalized.y},${normalized.zoom},${normalized.mode}`;
 }
 
 export function imagePlacementStyle(value: string | null | undefined): CSSProperties {
@@ -62,6 +66,7 @@ export function imagePlacementStyle(value: string | null | undefined): CSSProper
   const verticalFocus = 50 + placement.y;
 
   return {
+    objectFit: placement.mode,
     objectPosition: `${horizontalFocus}% ${verticalFocus}%`,
     transform: `scale(${placement.zoom / 100})`,
     transformOrigin: `${horizontalFocus}% ${verticalFocus}%`,
@@ -73,6 +78,7 @@ export function normalizeImagePlacement(placement: ImagePlacement): ImagePlaceme
     x: clamp(round(placement.x), -50, 50),
     y: clamp(round(placement.y), -50, 50),
     zoom: clamp(round(placement.zoom), 100, 250),
+    mode: placement.mode === "contain" ? "contain" : "cover",
   };
 }
 
