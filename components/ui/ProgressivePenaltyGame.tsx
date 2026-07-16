@@ -135,12 +135,12 @@ export function ProgressivePenaltyGame({
   };
 
   function revealCards() {
-    if (state.phase !== "closed") return;
+    if (!state || state.phase !== "closed") return;
     setState((current) => current ? { ...current, phase: "revealed" } : current);
   }
 
   function confirmPenalty() {
-    if (state.phase !== "revealed" || isSubmitting || submittedRef.current) return;
+    if (!state || state.phase !== "revealed" || isSubmitting || submittedRef.current) return;
     const results = [...state.results, roundResult];
     const isLastRound = state.currentRound === config.rounds.length - 1;
 
