@@ -140,7 +140,7 @@ export function ProgressivePenaltyGame({
   }
 
   function confirmPenalty() {
-    if (!state || state.phase !== "revealed" || isSubmitting || submittedRef.current) return;
+    if (!config || !state || state.phase !== "revealed" || isSubmitting || submittedRef.current) return;
     const results = [...state.results, roundResult];
     const isLastRound = state.currentRound === config.rounds.length - 1;
 
