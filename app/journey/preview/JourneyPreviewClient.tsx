@@ -30,6 +30,7 @@ export function JourneyPreviewClient({
   const [error, setError] = useState<string | null>(null);
   const [lastCompletedSlug, setLastCompletedSlug] = useState<string | null>(null);
   const [chapterReplayKey, setChapterReplayKey] = useState(0);
+  const [previewRunKey, setPreviewRunKey] = useState(0);
   const previewObjectUrlsRef = useRef<string[]>([]);
 
   const currentScene = scenes[currentSceneIndex] ?? null;
@@ -43,6 +44,7 @@ export function JourneyPreviewClient({
         const nextScenes = await getJourneyPreviewScenes({ code, previewToken: rpcPreviewToken });
         const normalizedScenes = nextScenes.map(resetForPreview);
         setScenes(normalizedScenes);
+        setPreviewRunKey((key) => key + 1);
 
         const nextIndex = preferredSlug
           ? Math.max(0, normalizedScenes.findIndex((scene) => scene.slug === preferredSlug))
@@ -314,6 +316,9 @@ export function JourneyPreviewClient({
               </p>
             </div>
           </div>
+          <button className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-4 text-xs font-semibold text-[#fffaf2]/68 transition hover:bg-white/[0.08] disabled:opacity-50" type="button" disabled={isLoading} onClick={() => refreshPreview(currentScene.slug)}>
+            <RotateCcw size={14} aria-hidden="true" /> Preview&apos;i sıfırla
+          </button>
           <label className="mt-4 block">
             <span className="mb-2 block text-[0.65rem] font-medium uppercase tracking-[0.14em] text-[#f4dcc0]/58">
               Sahneye hızlı geç
@@ -346,6 +351,7 @@ export function JourneyPreviewClient({
         <JourneySceneRenderer
           scene={currentScene}
           isSubmitting={isBusy}
+          persistenceScope={`journey-preview:${code}:${previewRunKey}`}
           onComplete={() => completeSceneLocally(currentScene.slug)}
           onSubmitPhoto={(file, rewardKey) => submitPhotoLocally(currentScene.slug, file, rewardKey)}
           onCompleteMiniGame={(params) => completeMiniGameLocally({ sceneSlug: currentScene.slug, ...params })}

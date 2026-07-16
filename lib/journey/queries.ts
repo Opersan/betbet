@@ -393,7 +393,7 @@ function normalizeTaskStatus(value: unknown): JourneyTaskResponse["status"] {
 }
 
 function normalizeMiniGameType(value: unknown): JourneyMiniGame["type"] {
-  const allowed: JourneyMiniGame["type"][] = ["memory_match", "tap_sequence", "scratch_reveal", "choice", "reaction_duel", "couple_quiz", "penalty_picker"];
+  const allowed: JourneyMiniGame["type"][] = ["memory_match", "tap_sequence", "scratch_reveal", "choice", "reaction_duel", "couple_quiz", "penalty_picker", "progressive_penalty"];
   return requireSupportedValue(value, allowed, "mini oyun tipi");
 }
 

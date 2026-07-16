@@ -1,27 +1,36 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export function JsonConfigEditor({
   label,
   value,
   onChange,
+  onValidityChange,
   rows = 8,
 }: {
   label: string;
   value: unknown;
   onChange: (nextValue: Record<string, unknown>) => void;
+  onValidityChange?: (isValid: boolean) => void;
   rows?: number;
 }) {
   const [text, setText] = useState(() => JSON.stringify(value ?? {}, null, 2));
   const error = useMemo(() => {
     try {
-      JSON.parse(text);
+      const parsed = JSON.parse(text);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return "JSON kökü bir nesne olmalı.";
+      }
       return null;
     } catch (caughtError) {
       return caughtError instanceof Error ? caughtError.message : "JSON parse edilemedi.";
     }
   }, [text]);
+
+  useEffect(() => {
+    onValidityChange?.(!error);
+  }, [error, onValidityChange]);
 
   return (
     <label className="block">

@@ -118,7 +118,7 @@ export type StudioMiniGame = {
   id: string;
   scene_slug: string;
   game_key: string;
-  game_type: "memory_match" | "tap_sequence" | "scratch_reveal" | "choice" | "reaction_duel" | "couple_quiz" | "penalty_picker";
+  game_type: "memory_match" | "tap_sequence" | "scratch_reveal" | "choice" | "reaction_duel" | "couple_quiz" | "penalty_picker" | "progressive_penalty";
   title: string;
   instructions: string | null;
   config: JsonRecord;

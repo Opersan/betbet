@@ -46,7 +46,7 @@ export type JourneyReward = {
 export type JourneyMiniGame = {
   id: string;
   gameKey: string;
-  type: "memory_match" | "tap_sequence" | "scratch_reveal" | "choice" | "reaction_duel" | "couple_quiz" | "penalty_picker";
+  type: "memory_match" | "tap_sequence" | "scratch_reveal" | "choice" | "reaction_duel" | "couple_quiz" | "penalty_picker" | "progressive_penalty";
   title: string;
   instructions?: string | null;
   config: Record<string, unknown>;

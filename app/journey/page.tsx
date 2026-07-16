@@ -16,6 +16,7 @@ import type { JourneyScene } from "@/lib/journey/types";
 export default function JourneyPage() {
   const reduceMotion = useReducedMotion();
   const {
+    accessCode,
     scenes,
     currentScene,
     currentSceneIndex,
@@ -162,6 +163,7 @@ export default function JourneyPage() {
         <JourneySceneRenderer
           scene={currentScene}
           isSubmitting={isCompleting || isUploading}
+          persistenceScope={`journey:${accessCode}`}
           onComplete={() => completeScene(currentScene.slug)}
           onSubmitPhoto={(file, rewardKey) => submitPhotoTask(currentScene.slug, file, rewardKey)}
           onCompleteMiniGame={(params) => completeMiniGame({ sceneSlug: currentScene.slug, ...params })}

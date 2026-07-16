@@ -1,4 +1,5 @@
 import type { ContentStudioData, StudioTable } from "./types";
+import { validateProgressivePenaltyConfig } from "@/lib/journey/progressive-penalty";
 
 export type ImportChange = {
   table: StudioTable;
@@ -64,7 +65,8 @@ export function buildImportChanges(current: ContentStudioData, incoming: Record<
 
       const id = typeof row.id === "string" ? row.id : null;
       const action = id && existingIds.has(id) ? "update" : "insert";
-      const validationError = getRowValidationError(table as StudioTable, row, action);
+      const existingRow = id ? existingRows.find((item) => item.id === id) : undefined;
+      const validationError = getRowValidationError(table as StudioTable, { ...existingRow, ...row }, action, current, incoming);
       if (validationError) {
         warnings.push(`${table}: ${validationError} Satır atlandı.`);
         continue;
@@ -85,7 +87,13 @@ export function buildImportChanges(current: ContentStudioData, incoming: Record<
   return { warnings, changes };
 }
 
-function getRowValidationError(table: StudioTable, row: Record<string, unknown>, action: "insert" | "update") {
+function getRowValidationError(
+  table: StudioTable,
+  row: Record<string, unknown>,
+  action: "insert" | "update",
+  current: ContentStudioData,
+  incoming: Record<string, unknown>,
+) {
   if (table === "journey_scenes") {
     return validateEnum(row.type ?? row.scene_type, ["welcome", "story", "task", "memory", "locked", "final", "chapter"], "desteklenmeyen sahne tipi", action === "update");
   }
@@ -93,7 +101,19 @@ function getRowValidationError(table: StudioTable, row: Record<string, unknown>,
     return validateEnum(row.block_type, ["text", "quote", "image", "video", "audio", "divider", "prompt", "reward", "game", "photo_task"], "desteklenmeyen içerik blok tipi", action === "update");
   }
   if (table === "journey_mini_games") {
-    return validateEnum(row.game_type, ["memory_match", "tap_sequence", "scratch_reveal", "choice", "reaction_duel", "couple_quiz", "penalty_picker"], "desteklenmeyen mini oyun tipi", action === "update");
+    const enumError = validateEnum(row.game_type, ["memory_match", "tap_sequence", "scratch_reveal", "choice", "reaction_duel", "couple_quiz", "penalty_picker", "progressive_penalty"], "desteklenmeyen mini oyun tipi", action === "update");
+    if (enumError) return enumError;
+    if (row.game_type === "progressive_penalty") {
+      const validation = validateProgressivePenaltyConfig(row.config);
+      if (validation.errors.length > 0) return `progressive_penalty config geçersiz: ${validation.errors.join(" ")}`;
+      const scene = current.scenes.find((item) => item.slug === row.scene_slug);
+      const incomingScene = Array.isArray(incoming.journey_scenes)
+        ? incoming.journey_scenes.find((item) => isRecord(item) && item.slug === row.scene_slug)
+        : undefined;
+      const sceneType = isRecord(incomingScene) ? incomingScene.type ?? incomingScene.scene_type : scene?.type;
+      if (sceneType !== "task") return "progressive_penalty yalnızca var olan veya aynı import içindeki task sahnesine bağlanabilir.";
+    }
+    return null;
   }
   if (table === "journey_scene_unlock_rules") {
     return validateEnum(row.unlock_mode, ["manual", "time", "all_completed", "time_and_all_completed"], "desteklenmeyen unlock modu", action === "update");

@@ -46,9 +46,11 @@ import type {
 } from "@/lib/content-studio/types";
 import type { JourneyContentBlock, JourneyMiniGame, JourneyReward, JourneyScene, JourneyTaskResponse } from "@/lib/journey/types";
 import { getChapterNumber } from "@/lib/journey/chapters";
+import { createDefaultProgressivePenaltyConfig, validateProgressivePenaltyConfig } from "@/lib/journey/progressive-penalty";
 import { cn } from "@/lib/utils";
 import { JsonConfigEditor } from "./JsonConfigEditor";
 import { MediaUploadField } from "./MediaUploadField";
+import { ProgressivePenaltyConfigEditor } from "./ProgressivePenaltyConfigEditor";
 
 type TabKey = "scene" | "blocks" | "unlock" | "game" | "reward" | "progress" | "json" | "timeline";
 type PreviewMode = "normal" | "locked" | "unlocked" | "task_pending" | "task_done";
@@ -71,7 +73,7 @@ const tabs: Array<{ key: TabKey; label: string }> = [
 const sceneTypes: SceneType[] = ["welcome", "story", "task", "memory", "locked", "final", "chapter"];
 const backgroundVariants: BackgroundVariant[] = ["night", "rose", "champagne", "deep"];
 const blockTypes: StudioContentBlock["block_type"][] = ["text", "quote", "image", "video", "audio", "divider", "prompt", "reward", "game", "photo_task"];
-const gameTypes: StudioMiniGame["game_type"][] = ["reaction_duel", "couple_quiz", "penalty_picker", "tap_sequence", "memory_match", "scratch_reveal", "choice"];
+const gameTypes: StudioMiniGame["game_type"][] = ["reaction_duel", "couple_quiz", "penalty_picker", "progressive_penalty", "tap_sequence", "memory_match", "scratch_reveal", "choice"];
 const unlockModes: StudioUnlockRule["unlock_mode"][] = ["manual", "time", "all_completed", "time_and_all_completed"];
 
 const emptyData: ContentStudioData = {
@@ -333,6 +335,7 @@ export function ContentStudio() {
             scene={selectedScene}
             previewMode={previewMode}
             previewSizeMode={previewSizeMode}
+            previewRunKey={previewKey}
             onPreviewModeChange={setPreviewMode}
             onPreviewSizeModeChange={setPreviewSizeMode}
             onReplay={() => setPreviewKey((key) => key + 1)}
@@ -946,11 +949,29 @@ function MiniGameEditor({ scene, game, onMutation }: { scene: StudioScene; game:
     sort_order: 100,
     is_active: true,
   });
+  const [isProgressiveEditorValid, setIsProgressiveEditorValid] = useState(true);
+  const isProgressivePenalty = form.game_type === "progressive_penalty";
+  const progressiveValidation = isProgressivePenalty ? validateProgressivePenaltyConfig(form.config) : null;
+  const progressiveSaveBlocked = Boolean(isProgressivePenalty && (scene.type !== "task" || progressiveValidation?.errors.length || !isProgressiveEditorValid));
 
   return (
     <div className="grid gap-4">
       <div className="grid grid-cols-2 gap-3">
-        <SelectField label="Oyun tipi" value={form.game_type ?? "reaction_duel"} options={gameTypes} onChange={(value) => setForm({ ...form, game_type: value as StudioMiniGame["game_type"] })} />
+        <SelectField
+          label="Oyun tipi"
+          value={form.game_type ?? "reaction_duel"}
+          options={gameTypes}
+          onChange={(value) => {
+            const gameType = value as StudioMiniGame["game_type"];
+            setForm({
+              ...form,
+              game_type: gameType,
+              config: gameType === "progressive_penalty" && form.game_type !== "progressive_penalty"
+                ? createDefaultProgressivePenaltyConfig() as unknown as JsonRecord
+                : form.config,
+            });
+          }}
+        />
         <Field label="Game key" value={form.game_key ?? "primary"} onChange={(value) => setForm({ ...form, game_key: value })} />
       </div>
       <Field label="Başlık" value={form.title ?? ""} onChange={(value) => setForm({ ...form, title: value })} />
@@ -960,9 +981,18 @@ function MiniGameEditor({ scene, game, onMutation }: { scene: StudioScene; game:
         <Field label="Sort" type="number" value={String(form.sort_order ?? 100)} onChange={(value) => setForm({ ...form, sort_order: Number(value) })} />
         <CheckField label="Aktif" checked={Boolean(form.is_active)} onChange={(checked) => setForm({ ...form, is_active: checked })} />
       </div>
-      <JsonConfigEditor label="Config JSON" value={form.config ?? {}} onChange={(config) => setForm({ ...form, config: config as JsonRecord })} rows={12} />
+      {isProgressivePenalty && scene.type !== "task" ? (
+        <div className="rounded-[8px] border border-amber-300/24 bg-amber-300/8 p-3 text-sm text-amber-100/75" role="alert">
+          progressive_penalty yalnızca task sahnesine bağlanabilir. Önce sahne tipini task yapmalısın.
+        </div>
+      ) : null}
+      {isProgressivePenalty ? (
+        <ProgressivePenaltyConfigEditor value={form.config ?? {}} onChange={(config) => setForm({ ...form, config })} onValidityChange={setIsProgressiveEditorValid} />
+      ) : (
+        <JsonConfigEditor label="Config JSON" value={form.config ?? {}} onChange={(config) => setForm({ ...form, config: config as JsonRecord })} rows={12} />
+      )}
       <div className="flex gap-2">
-        <button className="studio-primary-button" type="button" onClick={() => onMutation("Mini game kaydedildi.", "journey_mini_games", game ? "update" : "insert", { ...form, scene_slug: scene.slug } as Record<string, unknown>)}>
+        <button className="studio-primary-button" type="button" disabled={progressiveSaveBlocked} onClick={() => onMutation("Mini game kaydedildi.", "journey_mini_games", game ? "update" : "insert", { ...form, scene_slug: scene.slug } as Record<string, unknown>)}>
           <Save size={16} /> Kaydet
         </button>
         {game ? (
@@ -1237,6 +1267,7 @@ function ScenePreviewPanel({
   scene,
   previewMode,
   previewSizeMode,
+  previewRunKey,
   onPreviewModeChange,
   onPreviewSizeModeChange,
   onReplay,
@@ -1245,6 +1276,7 @@ function ScenePreviewPanel({
   scene: StudioScene | null;
   previewMode: PreviewMode;
   previewSizeMode: PreviewSizeMode;
+  previewRunKey: number;
   onPreviewModeChange: (mode: PreviewMode) => void;
   onPreviewSizeModeChange: (mode: PreviewSizeMode) => void;
   onReplay: () => void;
@@ -1398,6 +1430,7 @@ function ScenePreviewPanel({
                 <JourneySceneRenderer
                   scene={journeyScene}
                   isSubmitting={false}
+                  persistenceScope={`content-studio:${journeyScene.slug}:${effectivePreviewMode}:${previewRunKey}`}
                   onComplete={() => updatePreviewScene((current) => ({
                     ...current,
                     progressIsCompleted: true,

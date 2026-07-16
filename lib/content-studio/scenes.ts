@@ -86,7 +86,7 @@ function normalizeStudioData(value: unknown): ContentStudioData {
 
   assertSupportedRecordValues(scenes, "type", ["welcome", "story", "task", "memory", "locked", "final", "chapter"], "sahne tipi");
   assertSupportedRecordValues(contentBlocks, "block_type", ["text", "quote", "image", "video", "audio", "divider", "prompt", "reward", "game", "photo_task"], "içerik blok tipi");
-  assertSupportedRecordValues(miniGames, "game_type", ["memory_match", "tap_sequence", "scratch_reveal", "choice", "reaction_duel", "couple_quiz", "penalty_picker"], "mini oyun tipi");
+  assertSupportedRecordValues(miniGames, "game_type", ["memory_match", "tap_sequence", "scratch_reveal", "choice", "reaction_duel", "couple_quiz", "penalty_picker", "progressive_penalty"], "mini oyun tipi");
 
   return {
     scenes,

@@ -7,6 +7,7 @@ import type { JourneyMiniGame, JourneyScene } from "@/lib/journey/types";
 import { cn } from "@/lib/utils";
 import { PremiumCard } from "./PremiumCard";
 import { PrimaryActionButton } from "./PrimaryActionButton";
+import { ProgressivePenaltyGame } from "./ProgressivePenaltyGame";
 
 type CompleteMiniGameParams = {
   gameKey?: string;
@@ -31,14 +32,28 @@ type GameResult = {
 export function MiniGameCard({
   scene,
   isSubmitting,
+  persistenceScope,
   onComplete,
 }: {
   scene: JourneyScene;
   isSubmitting: boolean;
+  persistenceScope?: string;
   onComplete: (params: CompleteMiniGameParams) => void;
 }) {
   const game = scene.miniGame ?? null;
   const savedResult = getSavedResult(scene);
+
+  if (game?.type === "progressive_penalty") {
+    return (
+      <ProgressivePenaltyGame
+        scene={scene}
+        game={game}
+        isSubmitting={isSubmitting}
+        persistenceScope={persistenceScope}
+        onComplete={onComplete}
+      />
+    );
+  }
 
   if (game?.type === "reaction_duel") {
     return (

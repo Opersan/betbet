@@ -22,6 +22,7 @@ export type CompleteMiniGameParams = {
 export function JourneySceneRenderer({
   scene,
   isSubmitting,
+  persistenceScope,
   onComplete,
   onSubmitPhoto,
   onCompleteMiniGame,
@@ -29,6 +30,7 @@ export function JourneySceneRenderer({
 }: {
   scene: JourneyScene;
   isSubmitting: boolean;
+  persistenceScope?: string;
   onComplete: () => void | Promise<void>;
   onSubmitPhoto: (file: File, rewardKey?: string | null) => void | Promise<void>;
   onCompleteMiniGame: (params: CompleteMiniGameParams) => void | Promise<void>;
@@ -53,7 +55,7 @@ export function JourneySceneRenderer({
     if (scene.miniGame) {
       return (
         <SceneStack>
-          <MiniGameCard scene={scene} isSubmitting={isSubmitting} onComplete={onCompleteMiniGame} />
+          <MiniGameCard scene={scene} isSubmitting={isSubmitting} persistenceScope={persistenceScope} onComplete={onCompleteMiniGame} />
           <RewardRevealStack rewards={scene.rewards} isBusy={isSubmitting} onUnlock={onUnlockReward} />
         </SceneStack>
       );

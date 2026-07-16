@@ -90,6 +90,7 @@ Current frontend support:
 - `reaction_duel`
 - `couple_quiz`
 - `penalty_picker`
+- `progressive_penalty`
 
 `tap_sequence` example config:
 
@@ -147,6 +148,27 @@ Current frontend support:
   "alcoholNote": "Alkol tamamen opsiyoneldir; config içinde alkolsüz alternatifler de tutulabilir."
 }
 ```
+
+`progressive_penalty` is a config-driven, multi-round two-player game. It must be attached to a `task` scene. The loss plan is balanced and created once; there is no skip or reroll.
+
+```json
+{
+  "version": 1,
+  "players": ["Sen", "Ben"],
+  "rounds": [
+    { "id": "round-1", "title": "İlk Tur", "kind": "penalty", "penalty": "Kaybeden güzel bir anısını anlatır." },
+    { "id": "round-2", "title": "İkinci Tur", "kind": "penalty", "penalty": "Kaybeden bir iltifat eder." }
+  ],
+  "balanceMode": "strict",
+  "allowReroll": false,
+  "revealLabel": "Kartları Aç",
+  "confirmLabel": "Cezayı Tamamladık",
+  "completeLabel": "Oyunu Tamamla",
+  "finalText": "Tüm turlar tamamlandı."
+}
+```
+
+All fields above are required. `players` must contain exactly two distinct names, round IDs must be unique, `balanceMode` must be `strict`, and `allowReroll` must be `false`. Invalid configs are shown as errors and are never replaced with runtime defaults.
 
 When completed, the frontend calls `save_journey_task_response` with `response_type = 'mini_game'` and opens the configured reward key.
 

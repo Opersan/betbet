@@ -1,4 +1,5 @@
 import type { ContentStudioData, StudioScene } from "@/lib/content-studio/types";
+import { validateProgressivePenaltyConfig } from "@/lib/journey/progressive-penalty";
 
 export type ReadinessIssue = {
   code:
@@ -16,6 +17,7 @@ export type ReadinessIssue = {
     | "unlock_rule_missing_requirement"
     | "orphaned_relation"
     | "mini_game_reward_missing"
+    | "progressive_penalty_config_invalid"
     | "task_block_reward_missing"
     | "task_relation_on_non_task";
   severity: "error" | "warning";
@@ -215,7 +217,13 @@ function getRelationIssues(data: ContentStudioData) {
     const scene = sceneBySlug.get(game.scene_slug);
     if (!scene) return;
     if (scene.type !== "task") {
-      issues.push(buildIssue(scene, "task_relation_on_non_task", "warning", "Mini oyun task olmayan bir sahneye bağlı."));
+      issues.push(buildIssue(scene, "task_relation_on_non_task", game.game_type === "progressive_penalty" ? "error" : "warning", "Mini oyun task olmayan bir sahneye bağlı."));
+    }
+    if (game.game_type === "progressive_penalty") {
+      const validation = validateProgressivePenaltyConfig(game.config);
+      if (validation.errors.length > 0) {
+        issues.push(buildIssue(scene, "progressive_penalty_config_invalid", "error", `Progressive Penalty config geçersiz: ${validation.errors.join(" ")}`));
+      }
     }
     if (game.reward_key && !data.rewards.some((reward) => reward.scene_slug === game.scene_slug && reward.reward_key === game.reward_key)) {
       issues.push(buildIssue(scene, "mini_game_reward_missing", "error", `Mini oyunun ${game.reward_key} reward anahtarı bu sahnede bulunamadı.`));

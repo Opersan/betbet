@@ -518,6 +518,7 @@ Frontend'de dosya boyutu, piksel ölçüsü veya MIME doğrulaması yoktur. Bu s
 | `reaction_duel` | Tam | Aynı telefonda iki oyunculu refleks düellosu |
 | `couple_quiz` | Tam | Telefonu sırayla verme mantığında iki kişilik quiz |
 | `penalty_picker` | Tam | İki kapalı karttan ceza sahibi seçme |
+| `progressive_penalty` | Tam | Aynı telefonda, dengeli ceza planlı ve çok turlu iki oyunculu kart oyunu |
 | `tap_sequence` | Tam | Belirlenen ışık sırasını doğru tıklama |
 | `choice` | Koşullu | `config.mode` couple quiz veya penalty picker ise ilgili UI; diğer modlarda açık destek uyarısı |
 | `memory_match` | Hazır değil | Başka oyuna düşmez; görünür destek uyarısı verir |
@@ -583,7 +584,72 @@ Mekanik:
 - Seçilen kart armed ise birinci, değilse ikinci oyuncu kaybeder.
 - Kullanıcı sonucu kaydedebilir veya kaydetmeden kartları yenileyebilir.
 
-### 12.4 Tap sequence
+### 12.4 Progressive penalty
+
+Bu oyun yeni bir sahne tipi oluşturmaz; yalnızca `task` sahnesine bağlı normal bir `journey_mini_games` kaydıdır. Config sözleşmesi sürüm 1'dir:
+
+```json
+{
+  "version": 1,
+  "players": ["Sen", "Ben"],
+  "rounds": [
+    { "id": "round-1", "title": "İlk Tur", "kind": "penalty", "penalty": "Kaybeden güzel bir anısını anlatır." },
+    { "id": "round-2", "title": "İkinci Tur", "kind": "penalty", "penalty": "Kaybeden bir iltifat eder." }
+  ],
+  "balanceMode": "strict",
+  "allowReroll": false,
+  "revealLabel": "Kartları Aç",
+  "confirmLabel": "Cezayı Tamamladık",
+  "completeLabel": "Oyunu Tamamla",
+  "finalText": "Tüm turlar tamamlandı."
+}
+```
+
+Mekanik ve doğrulama:
+
+- `players` tam iki, boş olmayan ve farklı oyuncu adı içermelidir.
+- En az bir tur olmalı; her turda benzersiz `id`, dolu `title`, `kind` ve `penalty` bulunmalıdır.
+- `balanceMode="strict"` ve `allowReroll=false` zorunludur.
+- Çift tur sayısında kayıp sayıları eşit, tek tur sayısında fark en fazla birdir.
+- Rastgele kaybeden planı oyun ilk açıldığında bir kez üretilir; rerender ve sayfa yenilemede localStorage'dan korunur. Anahtar erişim kodu/preview kapsamı, scene, game key ve config parmak izini içerir.
+- Her turda iki kart birlikte açılır. Ceza onaylanmadan sonraki tura geçilemez; atlama ve yeniden seçim yoktur.
+- Son tur yalnızca bir kez `save_journey_task_response` akışına gönderilir. Payload bütün tur sonuçlarını, kayıp toplamlarını ve son tur özetini taşır.
+- Backend tamamlanmış response'u yerel ara durumdan önceliklidir. Yeniden ziyarette uzun oyun yerine kısa tamamlanma özeti gösterilir.
+- Geçersiz JSON/shape/config için fallback uygulanmaz; Journey ve preview görünür hata kartı, Studio ise alan bazlı hata listesi gösterir.
+- Studio ve Journey preview sonuçları yereldir. Studio'daki animasyon yenileme yeni bir plan üretir ve Supabase mutation yapmaz.
+
+Final response payload'ı mevcut `mini_game` callback/RPC akışında şu yapıyı korur:
+
+```json
+{
+  "gameType": "progressive_penalty",
+  "mode": "same_phone_progressive_penalty",
+  "version": 1,
+  "status": "completed",
+  "players": ["Sen", "Ben"],
+  "completedRounds": 2,
+  "rounds": [
+    { "id": "round-1", "title": "İlk Tur", "kind": "penalty", "winner": "Ben", "loser": "Sen", "penalty": "Kaybeden güzel bir anısını anlatır." },
+    { "id": "round-2", "title": "İkinci Tur", "kind": "penalty", "winner": "Sen", "loser": "Ben", "penalty": "Kaybeden bir iltifat eder." }
+  ],
+  "lossCounts": { "Sen": 1, "Ben": 1 },
+  "lastRound": { "id": "round-2", "title": "İkinci Tur", "kind": "penalty", "winner": "Sen", "loser": "Ben", "penalty": "Kaybeden bir iltifat eder." },
+  "winner": "Sen",
+  "loser": "Ben",
+  "penalty": "Kaybeden bir iltifat eder.",
+  "completedAt": "ISO-8601"
+}
+```
+
+Bilinen sınırlamalar:
+
+- Kısmi tur ilerlemesi backend'e yazılmaz; aynı browser ve access-code kapsamındaki localStorage'a bağlıdır. Browser verisi silinirse tamamlanmamış oyun geri getirilemez.
+- Farklı cihazlar arasında tamamlanmamış tur senkronizasyonu yoktur. Final response backend'e yazıldıktan sonra backend sonucu otoritatiftir.
+- localStorage kullanılamıyor veya kayıt bozuksa yeni dağılıma sessizce geçilmez; görünür hata gösterilir.
+- Bu geliştirme şema, migration veya hazır 7. Bölüm içeriği eklemez; oyun kaydı ayrı içerik adımında oluşturulmalıdır.
+- Mevcut remote `journey_mini_games` CHECK constraint'i henüz `progressive_penalty` değerini içermiyor. İçerik insert'inden önce, ayrı ve açıkça yetkilendirilmiş bir şema adımında constraint genişletilmelidir.
+
+### 12.5 Tap sequence
 
 Örnek config:
 
@@ -612,6 +678,8 @@ Eksik config durumunda:
 - Tap sequence: `rose`, `champagne`, `deep`
 - Quiz: iki örnek soru
 - Ceza: su, iltifat veya küçük görev içeren üç alkolsüz seçenek
+
+Bu eski oyun fallback'leri `progressive_penalty` için geçerli değildir. Progressive Penalty config'i eksik veya geçersizse oyun başlamaz ve açık doğrulama hatası gösterilir.
 
 ---
 
@@ -735,16 +803,12 @@ Chapter desteği yeni tablo açmadan mevcut sahne satırını kullanır. Constra
 
 ### RPC → frontend map işlemi
 
-`lib/journey/queries.ts` snake_case satırları camelCase frontend tiplerine dönüştürür. Bilinmeyen veya eksik değerlerde fallback uygular:
+`lib/journey/queries.ts` snake_case satırları camelCase frontend tiplerine dönüştürür. Desteklenen enum değerleri açık allowlist ile doğrulanır:
 
-- Bilinmeyen scene type → `story`
-- Bilinmeyen block type → `text`
-- Bilinmeyen task response type → `generic`
-- Bilinmeyen task status → `submitted`
-- Bilinmeyen mini game type → `tap_sequence`
+- Bilinmeyen scene, block, task response, task status veya mini game tipi açık hata üretir; başka bir tipe sessizce dönüştürülmez.
 - Eksik sort order → `100`
 
-Bu tolerans UI'ın kırılmasını azaltır ancak yanlış backend verisini sessizce başka bir tipe çevirebilir.
+Bu yaklaşım yanlış backend verisinin destekleniyormuş gibi görünmesini engeller.
 
 ### Storage bucket'ları
 
@@ -1709,6 +1773,8 @@ Sonuç olarak:
 | Self-reference veya circular dependency | Hata |
 | Mini game ve photo task için bozuk reward bağı | Hata |
 | Task olmayan sahneye task ilişkisi | Uyarı |
+| Progressive Penalty geçersiz config | Hata |
+| Progressive Penalty'nin task olmayan sahneye bağlanması | Hata |
 
 Her issue satırına tıklamak ilgili sahneyi editörde seçer. Bu kontroller veri tabanı constraint'i değildir; yayın öncesi editoryal doğrulamadır.
 
