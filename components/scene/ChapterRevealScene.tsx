@@ -19,6 +19,18 @@ type ChapterRevealSceneProps = {
 type RevealPhase = "revealing" | "content-exit" | "curtain-exit";
 
 const cinematicEase = [0.16, 1, 0.3, 1] as const;
+const chapterRevealTiming = {
+  standard: {
+    contentExit: 8700,
+    curtainExit: 9400,
+    complete: 10200,
+  },
+  reducedMotion: {
+    contentExit: 8000,
+    curtainExit: 8150,
+    complete: 8400,
+  },
+} as const;
 
 export function ChapterRevealScene({
   chapterNumber,
@@ -64,15 +76,13 @@ export function ChapterRevealScene({
       schedule(() => setCanSkip(true), 900);
     }
 
-    if (reduceMotion) {
-      schedule(() => setPhase("content-exit"), 650);
-      schedule(() => setPhase("curtain-exit"), 800);
-      schedule(completeOnce, 1050);
-    } else {
-      schedule(() => setPhase("content-exit"), 2900);
-      schedule(() => setPhase("curtain-exit"), 3600);
-      schedule(completeOnce, 4200);
-    }
+    const timing = reduceMotion
+      ? chapterRevealTiming.reducedMotion
+      : chapterRevealTiming.standard;
+
+    schedule(() => setPhase("content-exit"), timing.contentExit);
+    schedule(() => setPhase("curtain-exit"), timing.curtainExit);
+    schedule(completeOnce, timing.complete);
 
     return clearTimers;
   }, [allowSkip, clearTimers, completeOnce, previewMode, reduceMotion]);
