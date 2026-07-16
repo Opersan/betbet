@@ -3,6 +3,7 @@
 import { LockKeyhole, Sparkles } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
 import type { JourneyReward } from "@/lib/journey/types";
+import { imagePlacementStyle, readImagePlacement } from "@/lib/media/image-placement";
 import { PremiumCard } from "./PremiumCard";
 import { PrimaryActionButton } from "./PrimaryActionButton";
 import { RevealAnimation } from "./RevealAnimation";
@@ -79,9 +80,14 @@ function RewardCard({
           </motion.div>
         </div>
         {reward.imageUrl ? (
-          <div className="mb-5 overflow-hidden rounded-[8px] border border-white/10">
+          <div className="relative mb-5 aspect-[4/5] overflow-hidden rounded-[8px] border border-white/10 bg-black/24">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="aspect-[4/5] w-full object-cover" src={reward.imageUrl} alt={reward.title} />
+            <img
+              className="absolute inset-0 h-full w-full object-cover"
+              src={readImagePlacement(reward.imageUrl).src}
+              alt={reward.title}
+              style={imagePlacementStyle(reward.imageUrl)}
+            />
           </div>
         ) : null}
         {reward.videoUrl ? (

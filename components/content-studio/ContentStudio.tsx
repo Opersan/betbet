@@ -715,7 +715,7 @@ function SceneDetailsForm({ scene, isSaving, onSave }: { scene: StudioScene; isS
         <>
           <TextAreaField label="Ana içerik" value={form.content ?? ""} onChange={(value) => setForm({ ...form, content: value || null })} rows={8} />
           <div className="grid grid-cols-2 gap-3">
-            <MediaUploadField sceneSlug={form.slug} label="Image URL" value={form.image_url} onChange={(url) => setForm({ ...form, image_url: url })} />
+            <MediaUploadField enableImagePlacement sceneSlug={form.slug} label="Image URL" value={form.image_url} onChange={(url) => setForm({ ...form, image_url: url })} />
             <MediaUploadField sceneSlug={form.slug} label="Video URL" value={form.video_url} onChange={(url) => setForm({ ...form, video_url: url })} />
           </div>
           <div className="grid grid-cols-3 gap-3">
@@ -821,7 +821,7 @@ function ContentBlockForm({ block, blocks, onMutation }: { block: StudioContentB
         <TextAreaField label={form.block_type === "quote" ? "Alıntı / body" : "Metin / body"} value={form.body ?? ""} onChange={(value) => setForm({ ...form, body: value || null })} rows={4} />
         {["image", "video", "audio"].includes(form.block_type) ? (
           <div className="grid grid-cols-2 gap-3">
-            <MediaUploadField sceneSlug={form.scene_slug} label="Media URL" value={form.media_url} onChange={(url) => setForm({ ...form, media_url: url })} />
+            <MediaUploadField enableImagePlacement={form.block_type === "image"} sceneSlug={form.scene_slug} label="Media URL" value={form.media_url} onChange={(url) => setForm({ ...form, media_url: url })} />
             <Field label="Alt text / caption" value={form.alt_text ?? ""} onChange={(value) => setForm({ ...form, alt_text: value || null })} />
           </div>
         ) : null}
@@ -1046,7 +1046,7 @@ function RewardForm({ reward, onMutation }: { reward: StudioReward; onMutation: 
       <Field label="Subtitle" value={form.subtitle ?? ""} onChange={(value) => setForm({ ...form, subtitle: value || null })} />
       <TextAreaField label="Body" value={form.body ?? ""} onChange={(value) => setForm({ ...form, body: value || null })} rows={4} />
       <div className="grid grid-cols-2 gap-3">
-        <MediaUploadField sceneSlug={form.scene_slug} label="Image URL" value={form.image_url} onChange={(url) => setForm({ ...form, image_url: url })} />
+        <MediaUploadField enableImagePlacement sceneSlug={form.scene_slug} label="Image URL" value={form.image_url} onChange={(url) => setForm({ ...form, image_url: url })} />
         <MediaUploadField sceneSlug={form.scene_slug} label="Video URL" value={form.video_url} onChange={(url) => setForm({ ...form, video_url: url })} />
       </div>
       <JsonConfigEditor label="Metadata" value={form.metadata} onChange={(metadata) => setForm({ ...form, metadata: metadata as JsonRecord })} />

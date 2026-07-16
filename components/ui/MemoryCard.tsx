@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Camera } from "lucide-react";
+import { imagePlacementStyle, readImagePlacement } from "@/lib/media/image-placement";
 import { PremiumCard } from "./PremiumCard";
 
 export function MemoryCard({
@@ -17,6 +18,7 @@ export function MemoryCard({
 }) {
   const [failedImageUrl, setFailedImageUrl] = useState<string | null>(null);
   const showImage = Boolean(imageUrl && failedImageUrl !== imageUrl);
+  const imageSource = readImagePlacement(imageUrl).src;
 
   return (
     <PremiumCard className="w-full p-4">
@@ -25,9 +27,10 @@ export function MemoryCard({
           // eslint-disable-next-line @next/next/no-img-element
           <img
             className="absolute inset-0 h-full w-full object-cover"
-            src={imageUrl ?? undefined}
+            src={imageSource || undefined}
             alt={title}
             loading="lazy"
+            style={imagePlacementStyle(imageUrl)}
             onError={() => setFailedImageUrl(imageUrl ?? null)}
           />
         ) : (
