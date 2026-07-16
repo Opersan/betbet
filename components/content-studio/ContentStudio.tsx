@@ -52,6 +52,10 @@ import { MediaUploadField } from "./MediaUploadField";
 
 type TabKey = "scene" | "blocks" | "unlock" | "game" | "reward" | "progress" | "json" | "timeline";
 type PreviewMode = "normal" | "locked" | "unlocked" | "task_pending" | "task_done";
+type PreviewSizeMode = "fit" | "actual";
+
+const studioPreviewWidth = 390;
+const studioPreviewHeight = 844;
 
 const tabs: Array<{ key: TabKey; label: string }> = [
   { key: "scene", label: "Sahne" },
@@ -95,6 +99,7 @@ export function ContentStudio() {
   const [lockFilter, setLockFilter] = useState<"all" | "locked" | "open">("all");
   const [selectedSceneIds, setSelectedSceneIds] = useState<string[]>([]);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("normal");
+  const [previewSizeMode, setPreviewSizeMode] = useState<PreviewSizeMode>("fit");
   const [previewKey, setPreviewKey] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -118,6 +123,7 @@ export function ContentStudio() {
     try {
       const nextData = await loadContentStudioData(CONTENT_STUDIO_ACCESS_CODE);
       setData(nextData);
+      setPreviewKey((key) => key + 1);
       setSelectedSlug((currentSlug) => currentSlug ?? nextData.scenes[0]?.slug ?? null);
       setSelectedAccessCodeId((currentId) => currentId ?? nextData.accessCodes[0]?.id ?? null);
     } catch (caughtError) {
@@ -217,8 +223,8 @@ export function ContentStudio() {
   }, [data.scenes, lockFilter, query, typeFilter]);
 
   return (
-    <main className="min-h-[100dvh] bg-[#060712] text-[#fffaf2]">
-      <div className="hidden min-h-[100dvh] min-w-[1280px] grid-rows-[auto_1fr] xl:grid">
+    <main className="min-h-[100dvh] bg-[#060712] text-[#fffaf2] xl:h-[100dvh] xl:overflow-hidden">
+      <div className="hidden h-[100dvh] min-w-[1280px] grid-rows-[4rem_minmax(0,1fr)] overflow-hidden xl:grid">
         <ContentStudioToolbar
           activeAccessCode={activeAccessCode}
           accessCodes={data.accessCodes}
@@ -231,7 +237,7 @@ export function ContentStudio() {
           onDownload={() => downloadBackup(data)}
         />
 
-        <div className="grid min-h-0 grid-cols-[350px_minmax(540px,1fr)_430px] gap-4 px-4 pb-4">
+        <div className="grid min-h-0 grid-cols-[350px_minmax(540px,1fr)_430px] gap-4 overflow-hidden px-4 pb-4">
           <SceneListPanel
             scenes={filteredScenes}
             allScenes={data.scenes}
@@ -326,7 +332,9 @@ export function ContentStudio() {
             data={data}
             scene={selectedScene}
             previewMode={previewMode}
+            previewSizeMode={previewSizeMode}
             onPreviewModeChange={setPreviewMode}
+            onPreviewSizeModeChange={setPreviewSizeMode}
             onReplay={() => setPreviewKey((key) => key + 1)}
           />
         </div>
@@ -1224,10 +1232,28 @@ function TimelineView({ data, onMutation }: { data: ContentStudioData; onMutatio
   );
 }
 
-function ScenePreviewPanel({ data, scene, previewMode, onPreviewModeChange, onReplay }: { data: ContentStudioData; scene: StudioScene | null; previewMode: PreviewMode; onPreviewModeChange: (mode: PreviewMode) => void; onReplay: () => void }) {
+function ScenePreviewPanel({
+  data,
+  scene,
+  previewMode,
+  previewSizeMode,
+  onPreviewModeChange,
+  onPreviewSizeModeChange,
+  onReplay,
+}: {
+  data: ContentStudioData;
+  scene: StudioScene | null;
+  previewMode: PreviewMode;
+  previewSizeMode: PreviewSizeMode;
+  onPreviewModeChange: (mode: PreviewMode) => void;
+  onPreviewSizeModeChange: (mode: PreviewSizeMode) => void;
+  onReplay: () => void;
+}) {
   const effectivePreviewMode = scene?.type === "chapter" && (previewMode === "task_pending" || previewMode === "task_done")
     ? "normal"
     : previewMode;
+  const previewAreaRef = useRef<HTMLDivElement>(null);
+  const [fitScale, setFitScale] = useState(1);
   const [journeyScene, setJourneyScene] = useState<JourneyScene | null>(() =>
     scene ? buildJourneyScene(scene, data, effectivePreviewMode) : null,
   );
@@ -1246,15 +1272,29 @@ function ScenePreviewPanel({ data, scene, previewMode, onPreviewModeChange, onRe
   const isChapter = journeyScene?.type === "chapter";
 
   useEffect(() => {
-    setJourneyScene(scene ? buildJourneyScene(scene, data, effectivePreviewMode) : null);
-    setPreviewMediaUrl(null);
-  }, [data, effectivePreviewMode, scene]);
-
-  useEffect(() => {
     return () => {
       if (previewMediaUrl) URL.revokeObjectURL(previewMediaUrl);
     };
   }, [previewMediaUrl]);
+
+  useEffect(() => {
+    const previewArea = previewAreaRef.current;
+    if (!previewArea) return;
+
+    const updateFitScale = () => {
+      const nextScale = Math.min(
+        1,
+        previewArea.clientWidth / studioPreviewWidth,
+        previewArea.clientHeight / studioPreviewHeight,
+      );
+      setFitScale(Number.isFinite(nextScale) && nextScale > 0 ? nextScale : 1);
+    };
+
+    updateFitScale();
+    const observer = new ResizeObserver(updateFitScale);
+    observer.observe(previewArea);
+    return () => observer.disconnect();
+  }, []);
 
   function updatePreviewScene(updater: (current: JourneyScene) => JourneyScene) {
     setJourneyScene((current) => (current ? updater(current) : current));
@@ -1273,81 +1313,135 @@ function ScenePreviewPanel({ data, scene, previewMode, onPreviewModeChange, onRe
   }
 
   return (
-    <aside className="studio-panel min-h-0 overflow-y-auto p-4">
-      <div className="mb-3 flex items-center justify-between">
-        <div>
-          <p className="font-semibold">Canlı önizleme</p>
-          <p className="mt-1 text-xs text-[#fffaf2]/50">390px mobil simülasyon</p>
+    <aside className="studio-panel flex min-h-0 flex-col overflow-hidden p-4">
+      <div className="shrink-0">
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <p className="font-semibold">Canlı önizleme</p>
+            <p className="mt-1 text-xs text-[#fffaf2]/50">390 × 844 mobil simülasyon</p>
+          </div>
+          <button className="studio-button" type="button" onClick={onReplay}>
+            <Eye size={15} /> {isChapter ? "Bölüm Jeneriğini Oynat" : "Animasyonu Yenile"}
+          </button>
         </div>
-        <button className="studio-button" type="button" onClick={onReplay}>
-          <Eye size={15} /> {isChapter ? "Bölüm Jeneriğini Oynat" : "Animasyonu Yenile"}
-        </button>
+        <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
+          <select className="studio-input" value={effectivePreviewMode} onChange={(event) => onPreviewModeChange(event.target.value as PreviewMode)}>
+            <option value="normal">Normal görünüm</option>
+            <option value="locked">Kilitli görünüm</option>
+            <option value="unlocked">Kilidi açılmış</option>
+            {!isChapter ? <option value="task_pending">Görev tamamlanmamış</option> : null}
+            {!isChapter ? <option value="task_done">Görev tamamlanmış</option> : null}
+          </select>
+          <div className="flex rounded-[8px] border border-white/10 bg-[#080a16]/88 p-1" aria-label="Önizleme ölçeği">
+            <button
+              className={cn(
+                "rounded-[6px] px-2.5 text-xs font-semibold transition-colors",
+                previewSizeMode === "fit" ? "bg-[#f4dcc0]/14 text-[#f4dcc0]" : "text-[#fffaf2]/48 hover:text-[#fffaf2]/72",
+              )}
+              type="button"
+              aria-pressed={previewSizeMode === "fit"}
+              onClick={() => onPreviewSizeModeChange("fit")}
+            >
+              Sığdır
+            </button>
+            <button
+              className={cn(
+                "rounded-[6px] px-2.5 text-xs font-semibold transition-colors",
+                previewSizeMode === "actual" ? "bg-[#f4dcc0]/14 text-[#f4dcc0]" : "text-[#fffaf2]/48 hover:text-[#fffaf2]/72",
+              )}
+              type="button"
+              aria-pressed={previewSizeMode === "actual"}
+              onClick={() => onPreviewSizeModeChange("actual")}
+            >
+              %100
+            </button>
+          </div>
+        </div>
       </div>
-      <select className="studio-input mb-3" value={effectivePreviewMode} onChange={(event) => onPreviewModeChange(event.target.value as PreviewMode)}>
-        <option value="normal">Normal görünüm</option>
-        <option value="locked">Kilitli görünüm</option>
-        <option value="unlocked">Kilidi açılmış</option>
-        {!isChapter ? <option value="task_pending">Görev tamamlanmamış</option> : null}
-        {!isChapter ? <option value="task_done">Görev tamamlanmış</option> : null}
-      </select>
-      <div className="mx-auto w-[390px] overflow-hidden rounded-[18px] border border-white/14 bg-[#070814] shadow-[0_24px_90px_rgba(0,0,0,0.42)]">
-        {journeyScene?.type === "chapter" && !journeyScene.isLocked ? (
-          <ChapterRevealScene
-            chapterNumber={chapterNumber}
-            title={journeyScene.title}
-            subtitle={journeyScene.subtitle}
-            direction="forward"
-            allowSkip
-            previewMode={true}
-            onComplete={() => undefined}
-          />
-        ) : journeyScene ? (
-          <MobileSceneLayout title={journeyScene.title} subtitle={journeyScene.subtitle ?? undefined} backgroundVariant={journeyScene.backgroundVariant ?? "night"} isLocked={journeyScene.isLocked} progress={{ current: 1, total: 1, states: [journeyScene.isLocked ? "locked" : journeyScene.progressIsCompleted ? "completed" : "unlocked"] }}>
-            <JourneySceneRenderer
-              scene={journeyScene}
-              isSubmitting={false}
-              onComplete={() => updatePreviewScene((current) => ({
-                ...current,
-                progressIsCompleted: true,
-                completedAt: new Date().toISOString(),
-              }))}
-              onSubmitPhoto={(file, rewardKey) => {
-                const mediaUrl = URL.createObjectURL(file);
-                setPreviewMediaUrl(mediaUrl);
-                updatePreviewScene((current) => ({
-                  ...current,
-                  progressIsCompleted: true,
-                  completedAt: new Date().toISOString(),
-                  taskResponse: buildStudioPreviewTaskResponse(
-                    "photo",
-                    rewardKey,
-                    { fileName: file.name, fileSize: file.size, mimeType: file.type, previewOnly: true },
-                    mediaUrl,
-                  ),
-                }));
-                unlockPreviewReward(rewardKey);
-              }}
-              onCompleteMiniGame={(params: CompleteMiniGameParams) => {
-                updatePreviewScene((current) => ({
-                  ...current,
-                  progressIsCompleted: true,
-                  completedAt: new Date().toISOString(),
-                  taskResponse: buildStudioPreviewTaskResponse(
-                    "mini_game",
-                    params.rewardKey,
-                    { ...params.payload, gameKey: params.gameKey ?? "primary", previewOnly: true },
-                    null,
-                    params.score,
-                  ),
-                }));
-                unlockPreviewReward(params.rewardKey);
-              }}
-              onUnlockReward={(rewardKey) => unlockPreviewReward(rewardKey)}
-            />
-          </MobileSceneLayout>
-        ) : (
-          <div className="p-6 text-sm text-[#fffaf2]/60">Sahne seç.</div>
-        )}
+      <div ref={previewAreaRef} className="min-h-0 flex-1 overflow-auto overscroll-contain rounded-[12px] bg-black/15">
+        <div
+          className="relative mx-auto"
+          style={{
+            width: studioPreviewWidth * (previewSizeMode === "fit" ? fitScale : 1),
+            height: studioPreviewHeight * (previewSizeMode === "fit" ? fitScale : 1),
+          }}
+        >
+          <div
+            className="absolute left-1/2 top-0 overflow-hidden rounded-[18px] border border-white/14 bg-[#070814] shadow-[0_24px_90px_rgba(0,0,0,0.42)]"
+            style={{
+              width: studioPreviewWidth,
+              height: studioPreviewHeight,
+              transform: `translateX(-50%) scale(${previewSizeMode === "fit" ? fitScale : 1})`,
+              transformOrigin: "top center",
+            }}
+          >
+            {journeyScene?.type === "chapter" && !journeyScene.isLocked ? (
+              <ChapterRevealScene
+                chapterNumber={chapterNumber}
+                title={journeyScene.title}
+                subtitle={journeyScene.subtitle}
+                direction="forward"
+                allowSkip
+                previewMode={true}
+                embeddedViewport
+                onComplete={() => undefined}
+              />
+            ) : journeyScene ? (
+              <MobileSceneLayout
+                title={journeyScene.title}
+                subtitle={journeyScene.subtitle ?? undefined}
+                backgroundVariant={journeyScene.backgroundVariant ?? "night"}
+                isLocked={journeyScene.isLocked}
+                embeddedViewport
+                progress={{ current: 1, total: 1, states: [journeyScene.isLocked ? "locked" : journeyScene.progressIsCompleted ? "completed" : "unlocked"] }}
+              >
+                <JourneySceneRenderer
+                  scene={journeyScene}
+                  isSubmitting={false}
+                  onComplete={() => updatePreviewScene((current) => ({
+                    ...current,
+                    progressIsCompleted: true,
+                    completedAt: new Date().toISOString(),
+                  }))}
+                  onSubmitPhoto={(file, rewardKey) => {
+                    const mediaUrl = URL.createObjectURL(file);
+                    setPreviewMediaUrl(mediaUrl);
+                    updatePreviewScene((current) => ({
+                      ...current,
+                      progressIsCompleted: true,
+                      completedAt: new Date().toISOString(),
+                      taskResponse: buildStudioPreviewTaskResponse(
+                        "photo",
+                        rewardKey,
+                        { fileName: file.name, fileSize: file.size, mimeType: file.type, previewOnly: true },
+                        mediaUrl,
+                      ),
+                    }));
+                    unlockPreviewReward(rewardKey);
+                  }}
+                  onCompleteMiniGame={(params: CompleteMiniGameParams) => {
+                    updatePreviewScene((current) => ({
+                      ...current,
+                      progressIsCompleted: true,
+                      completedAt: new Date().toISOString(),
+                      taskResponse: buildStudioPreviewTaskResponse(
+                        "mini_game",
+                        params.rewardKey,
+                        { ...params.payload, gameKey: params.gameKey ?? "primary", previewOnly: true },
+                        null,
+                        params.score,
+                      ),
+                    }));
+                    unlockPreviewReward(params.rewardKey);
+                  }}
+                  onUnlockReward={(rewardKey) => unlockPreviewReward(rewardKey)}
+                />
+              </MobileSceneLayout>
+            ) : (
+              <div className="p-6 text-sm text-[#fffaf2]/60">Sahne seç.</div>
+            )}
+          </div>
+        </div>
       </div>
     </aside>
   );

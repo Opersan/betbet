@@ -789,6 +789,8 @@ http://localhost:3000/content-studio
 
 ### Genel arayüz
 
+Masaüstü çalışma alanı viewport yüksekliğine sabitlenir. Sol sahne listesi, orta editör ve sağ canlı önizleme birbirinden bağımsız kayar; sahne seçimi tarayıcı sayfasını yeniden yukarı taşımayı gerektirmez.
+
 Üst toolbar:
 
 - Access code seçimi
@@ -825,7 +827,9 @@ Orta editör sekmeleri:
 
 Sağ sütun:
 
-- 390 px mobil simülasyon
+- 390 x 844 px mobil simülasyon
+- Önizlemenin tamamını çalışma alanına ölçekleyen varsayılan **Sığdır** modu
+- Piksel boyutunu koruyan ve yalnızca önizleme alanında kaydırma açan **%100** modu
 - Normal, locked, unlocked, task pending ve task done modları
 - Animasyonu yeniden oynatma
 - Chapter seçiliyken gerçek `ChapterRevealScene` ile “Bölüm Jeneriğini Oynat” kontrolü

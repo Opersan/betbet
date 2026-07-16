@@ -28,6 +28,7 @@ export type MobileSceneLayoutProps = {
   animationDirection?: "forward" | "backward";
   backgroundVariant?: BackgroundVariant;
   showSoundControl?: boolean;
+  embeddedViewport?: boolean;
 };
 
 export function MobileSceneLayout({
@@ -43,14 +44,25 @@ export function MobileSceneLayout({
   animationDirection = "forward",
   backgroundVariant = "night",
   showSoundControl = false,
+  embeddedViewport = false,
 }: MobileSceneLayoutProps) {
   return (
-    <main className="relative min-h-[100dvh] overflow-x-hidden bg-[#070814] text-[#fffaf2]">
+    <main
+      className={cn(
+        "relative overflow-x-hidden bg-[#070814] text-[#fffaf2]",
+        embeddedViewport ? "h-full min-h-full" : "min-h-[100dvh]",
+      )}
+    >
       <SoftGradientBackground variant={backgroundVariant} />
       <FloatingParticles />
       {showSoundControl ? <SoundControlButton /> : null}
 
-      <div className="relative mx-auto flex min-h-[100dvh] w-full max-w-[430px] flex-col px-5 pt-[max(1.75rem,calc(env(safe-area-inset-top)+1rem))]">
+      <div
+        className={cn(
+          "relative mx-auto flex w-full max-w-[430px] flex-col px-5 pt-[max(1.75rem,calc(env(safe-area-inset-top)+1rem))]",
+          embeddedViewport ? "h-full min-h-full" : "min-h-[100dvh]",
+        )}
+      >
         <section className="flex min-h-0 flex-1 flex-col">
           <header className={cn("shrink-0 pb-4 pt-2", showSoundControl && "pr-12")}>
             {progress ? (

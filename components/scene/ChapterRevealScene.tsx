@@ -3,6 +3,7 @@
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getChapterLabel } from "@/lib/journey/chapters";
+import { cn } from "@/lib/utils";
 
 type ChapterRevealSceneProps = {
   chapterNumber: number;
@@ -12,6 +13,7 @@ type ChapterRevealSceneProps = {
   direction: "forward" | "backward";
   allowSkip: boolean;
   previewMode: boolean;
+  embeddedViewport?: boolean;
 };
 
 type RevealPhase = "revealing" | "content-exit" | "curtain-exit";
@@ -26,6 +28,7 @@ export function ChapterRevealScene({
   direction,
   allowSkip,
   previewMode,
+  embeddedViewport = false,
 }: ChapterRevealSceneProps) {
   const reduceMotion = useReducedMotion();
   const onCompleteRef = useRef(onComplete);
@@ -107,7 +110,10 @@ export function ChapterRevealScene({
 
   return (
     <div
-      className="relative isolate flex min-h-[100dvh] w-full cursor-default items-center justify-center overflow-hidden bg-[#020203] px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] text-center outline-none"
+      className={cn(
+        "relative isolate flex w-full cursor-default items-center justify-center overflow-hidden bg-[#020203] px-5 pb-[max(2rem,env(safe-area-inset-bottom))] pt-[max(2rem,env(safe-area-inset-top))] text-center outline-none",
+        embeddedViewport ? "h-full min-h-full" : "min-h-[100dvh]",
+      )}
       onPointerUp={finishEarly}
       onKeyDown={handleKeyDown}
       role={allowSkip ? "button" : undefined}
