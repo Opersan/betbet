@@ -116,11 +116,11 @@ function ImagePlacementEditor({
           />
         </div>
         <div className="grid content-start grid-cols-3 gap-2">
-          <PlacementNumberField label="X (px)" value={placement.x} min={-500} max={500} onChange={(value) => update("x", value)} />
-          <PlacementNumberField label="Y (px)" value={placement.y} min={-500} max={500} onChange={(value) => update("y", value)} />
-          <PlacementNumberField label="Zoom (%)" value={placement.zoom} min={50} max={250} onChange={(value) => update("zoom", value)} />
+          <PlacementNumberField label="X" value={placement.x} min={-50} max={50} onChange={(value) => update("x", value)} />
+          <PlacementNumberField label="Y" value={placement.y} min={-50} max={50} onChange={(value) => update("y", value)} />
+          <PlacementNumberField label="Zoom (%)" value={placement.zoom} min={100} max={250} onChange={(value) => update("zoom", value)} />
           <p className="col-span-3 text-[11px] leading-4 text-[#fffaf2]/48">
-            Pozitif X sağa, pozitif Y aşağı taşır. Orijinal dosya yeniden sıkıştırılmaz.
+            +X sağ tarafı, +Y alt tarafı gösterir. %100 çerçeveyi boşluksuz dolduran minimum zoom seviyesidir.
           </p>
           <button
             className="studio-mini-button col-span-3 justify-self-start"

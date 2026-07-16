@@ -30,11 +30,11 @@ export function readImagePlacement(value: string | null | undefined): {
 
   return {
     src,
-    placement: {
+    placement: normalizeImagePlacement({
       x: finiteNumber(rawX, defaultImagePlacement.x),
       y: finiteNumber(rawY, defaultImagePlacement.y),
       zoom: finiteNumber(rawZoom, defaultImagePlacement.zoom),
-    },
+    }),
   };
 }
 
@@ -58,18 +58,21 @@ export function writeImagePlacement(
 
 export function imagePlacementStyle(value: string | null | undefined): CSSProperties {
   const { placement } = readImagePlacement(value);
+  const horizontalFocus = 50 + placement.x;
+  const verticalFocus = 50 + placement.y;
 
   return {
-    transform: `translate3d(${placement.x}px, ${placement.y}px, 0) scale(${placement.zoom / 100})`,
-    transformOrigin: "center",
+    objectPosition: `${horizontalFocus}% ${verticalFocus}%`,
+    transform: `scale(${placement.zoom / 100})`,
+    transformOrigin: `${horizontalFocus}% ${verticalFocus}%`,
   };
 }
 
 export function normalizeImagePlacement(placement: ImagePlacement): ImagePlacement {
   return {
-    x: clamp(round(placement.x), -500, 500),
-    y: clamp(round(placement.y), -500, 500),
-    zoom: clamp(round(placement.zoom), 50, 250),
+    x: clamp(round(placement.x), -50, 50),
+    y: clamp(round(placement.y), -50, 50),
+    zoom: clamp(round(placement.zoom), 100, 250),
   };
 }
 
