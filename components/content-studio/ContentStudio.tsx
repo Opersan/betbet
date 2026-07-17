@@ -47,6 +47,7 @@ import type {
 import type { JourneyContentBlock, JourneyMiniGame, JourneyReward, JourneyScene, JourneyTaskResponse } from "@/lib/journey/types";
 import { getChapterNumber } from "@/lib/journey/chapters";
 import { createDefaultProgressivePenaltyConfig, validateProgressivePenaltyConfig } from "@/lib/journey/progressive-penalty";
+import { createDefaultMemoryMatchConfig, createDefaultScratchRevealConfig } from "@/lib/journey/standard-mini-game-config";
 import { cn } from "@/lib/utils";
 import { JsonConfigEditor } from "./JsonConfigEditor";
 import { MediaUploadField } from "./MediaUploadField";
@@ -963,12 +964,17 @@ function MiniGameEditor({ scene, game, onMutation }: { scene: StudioScene; game:
           options={gameTypes}
           onChange={(value) => {
             const gameType = value as StudioMiniGame["game_type"];
+            const isChangingType = form.game_type !== gameType;
             setForm({
               ...form,
               game_type: gameType,
-              config: gameType === "progressive_penalty" && form.game_type !== "progressive_penalty"
+              config: isChangingType && gameType === "progressive_penalty"
                 ? createDefaultProgressivePenaltyConfig() as unknown as JsonRecord
-                : form.config,
+                : isChangingType && gameType === "memory_match"
+                  ? createDefaultMemoryMatchConfig() as unknown as JsonRecord
+                  : isChangingType && gameType === "scratch_reveal"
+                    ? createDefaultScratchRevealConfig() as unknown as JsonRecord
+                    : form.config,
             });
           }}
         />

@@ -91,6 +91,11 @@ Current frontend support:
 - `couple_quiz`
 - `penalty_picker`
 - `progressive_penalty`
+- `memory_match`
+- `scratch_reveal`
+- `choice` with `mode = couple_quiz` or `mode = penalty_picker`
+
+The complete field reference and LLM-ready examples live in [`MINI_GAME_CONFIG_GUIDE.md`](./MINI_GAME_CONFIG_GUIDE.md).
 
 `tap_sequence` example config:
 
@@ -99,6 +104,37 @@ Current frontend support:
   "sequence": ["rose", "champagne", "deep"],
   "labels": ["Gül", "Işık", "Gece"],
   "successScore": 3
+}
+```
+
+`memory_match` turns every configured pair into two shuffled cards and completes when all pairs are found.
+
+```json
+{
+  "pairs": [
+    { "id": "first-date", "label": "İlk Buluşma" },
+    { "id": "our-song", "label": "Bizim Şarkımız" },
+    { "id": "best-trip", "label": "En Güzel Yolculuk" },
+    { "id": "favorite-photo", "label": "Sevdiğimiz Fotoğraf" }
+  ],
+  "backLabel": "Kartı aç",
+  "matchedLabel": "Eşleşti",
+  "completionText": "Bütün anılar eşleşti. Oyunu tamamladınız."
+}
+```
+
+`scratch_reveal` provides a touch and pointer scratch surface plus an accessible one-tap reveal action.
+
+```json
+{
+  "revealTitle": "Bu Gece İçin Bir Sürpriz",
+  "revealText": "Bir sonraki durağımızı sen seçiyorsun. Bütün plan benden.",
+  "imageUrl": null,
+  "imageAlt": "Kazıma alanının altındaki sürpriz görsel",
+  "coverLabel": "Sürprizi görmek için alanı kazı",
+  "revealButtonLabel": "Tek Dokunuşla Aç",
+  "completionText": "Sürpriz tamamen açıldı.",
+  "successThreshold": 55
 }
 ```
 

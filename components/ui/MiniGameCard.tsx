@@ -8,6 +8,8 @@ import { cn } from "@/lib/utils";
 import { PremiumCard } from "./PremiumCard";
 import { PrimaryActionButton } from "./PrimaryActionButton";
 import { ProgressivePenaltyGame } from "./ProgressivePenaltyGame";
+import { MemoryMatchGame } from "./MemoryMatchGame";
+import { ScratchRevealGame } from "./ScratchRevealGame";
 
 type CompleteMiniGameParams = {
   gameKey?: string;
@@ -94,6 +96,30 @@ export function MiniGameCard({
   if (game?.type === "tap_sequence") {
     return (
       <TapSequenceGame
+        game={game}
+        isCompleted={scene.progressIsCompleted || scene.taskResponse?.type === "mini_game"}
+        isSubmitting={isSubmitting}
+        onComplete={onComplete}
+      />
+    );
+  }
+
+  if (game?.type === "memory_match") {
+    return (
+      <MemoryMatchGame
+        key={game.id}
+        game={game}
+        isCompleted={scene.progressIsCompleted || scene.taskResponse?.type === "mini_game"}
+        isSubmitting={isSubmitting}
+        onComplete={onComplete}
+      />
+    );
+  }
+
+  if (game?.type === "scratch_reveal") {
+    return (
+      <ScratchRevealGame
+        key={game.id}
         game={game}
         isCompleted={scene.progressIsCompleted || scene.taskResponse?.type === "mini_game"}
         isSubmitting={isSubmitting}
