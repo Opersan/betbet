@@ -2,6 +2,7 @@
 
 import { LockKeyhole, Sparkles } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
+import { SceneRevealItem } from "@/components/scene/AnimatedPageTransition";
 import type { JourneyReward } from "@/lib/journey/types";
 import { PositionedImage } from "./PositionedImage";
 import { PremiumCard } from "./PremiumCard";
@@ -53,12 +54,12 @@ function RewardCard({
             {reward.subtitle ? <p className="mt-2 text-sm leading-6 text-[#fffaf2]/62">{reward.subtitle}</p> : null}
           </div>
         </div>
-        <div className="mt-5">
+        <SceneRevealItem stage="action" className="mt-5">
           <PrimaryActionButton disabled={isBusy} onClick={() => onUnlock(reward.rewardKey)}>
             {isBusy ? "Açılıyor" : "Ödülü Aç"}
             <Sparkles size={18} strokeWidth={1.7} />
           </PrimaryActionButton>
-        </div>
+        </SceneRevealItem>
       </PremiumCard>
     );
   }
@@ -80,12 +81,12 @@ function RewardCard({
           </motion.div>
         </div>
         {reward.imageUrl ? (
-          <div className="relative mb-5 aspect-[4/5] overflow-hidden rounded-[8px] border border-white/10 bg-black/24">
+          <SceneRevealItem stage="media" className="relative mb-5 aspect-[4/5] overflow-hidden rounded-[8px] border border-white/10 bg-black/24">
             <PositionedImage
               value={reward.imageUrl}
               alt={reward.title}
             />
-          </div>
+          </SceneRevealItem>
         ) : null}
         {reward.videoUrl ? (
           <div className="mb-5 overflow-hidden rounded-[8px] border border-white/10 bg-black/24">

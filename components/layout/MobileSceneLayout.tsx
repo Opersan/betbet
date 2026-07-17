@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { SoftGradientBackground } from "@/components/background/SoftGradientBackground";
 import { FloatingParticles } from "@/components/background/FloatingParticles";
-import { AnimatedPageTransition } from "@/components/scene/AnimatedPageTransition";
+import { AnimatedPageTransition, SceneRevealItem } from "@/components/scene/AnimatedPageTransition";
 import { BottomNavigationControls, type SceneAction } from "@/components/scene/BottomNavigationControls";
 import { ProgressDots, type ProgressDotState } from "@/components/scene/ProgressDots";
 import { SideArrowNavigation } from "@/components/scene/SideArrowNavigation";
@@ -29,6 +29,9 @@ export type MobileSceneLayoutProps = {
   backgroundVariant?: BackgroundVariant;
   showSoundControl?: boolean;
   embeddedViewport?: boolean;
+  sceneKey?: string;
+  criticalMediaUrl?: string | null;
+  nextMediaUrl?: string | null;
 };
 
 export function MobileSceneLayout({
@@ -45,6 +48,9 @@ export function MobileSceneLayout({
   backgroundVariant = "night",
   showSoundControl = false,
   embeddedViewport = false,
+  sceneKey,
+  criticalMediaUrl,
+  nextMediaUrl,
 }: MobileSceneLayoutProps) {
   return (
     <main
@@ -63,44 +69,56 @@ export function MobileSceneLayout({
           embeddedViewport ? "h-full min-h-full" : "min-h-[100dvh]",
         )}
       >
-        <section className="flex min-h-0 flex-1 flex-col">
-          <header className={cn("shrink-0 pb-4 pt-2", showSoundControl && "pr-12")}>
-            {progress ? (
-              <div className="mb-5">
-                <ProgressDots current={progress.current} total={progress.total} states={progress.states} />
-              </div>
-            ) : null}
-            {title ? (
-              <h1 className="break-words text-[clamp(1.78rem,7.4vw,2.05rem)] font-semibold leading-[1.08] tracking-normal [text-wrap:balance]">
-                {title}
-              </h1>
-            ) : null}
-            {subtitle ? <p className="mt-3 text-base leading-7 text-[#fffaf2]/70">{subtitle}</p> : null}
-          </header>
+        <AnimatedPageTransition
+          animationDirection={animationDirection}
+          transitionKey={sceneKey ?? `${progress?.current ?? 0}-${title ?? "scene"}`}
+          criticalMediaUrl={criticalMediaUrl}
+          nextMediaUrl={nextMediaUrl}
+          revealSceneContent={Boolean(sceneKey)}
+          className="flex min-h-0 w-full flex-1 flex-col"
+        >
+          <section className="flex min-h-0 flex-1 flex-col">
+            <header className={cn("shrink-0 pb-4 pt-2", showSoundControl && "pr-12")}>
+              {progress ? (
+                <SceneRevealItem stage="progress" className="mb-5">
+                  <ProgressDots current={progress.current} total={progress.total} states={progress.states} />
+                </SceneRevealItem>
+              ) : null}
+              {title ? (
+                <SceneRevealItem stage="title">
+                  <h1 className="break-words text-[clamp(1.78rem,7.4vw,2.05rem)] font-semibold leading-[1.08] tracking-normal [text-wrap:balance]">
+                    {title}
+                  </h1>
+                </SceneRevealItem>
+              ) : null}
+              {subtitle ? (
+                <SceneRevealItem stage="subtitle" className="mt-3">
+                  <p className="text-base leading-7 text-[#fffaf2]/70">{subtitle}</p>
+                </SceneRevealItem>
+              ) : null}
+            </header>
 
-          <div
-            className={cn(
-              "relative flex min-h-0 flex-1 items-center overflow-y-auto overscroll-contain py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-              isLocked && "opacity-95",
-            )}
-          >
-            {showSideArrows ? <SideArrowNavigation onPrevious={previousAction} onNext={nextAction} /> : null}
-            <AnimatedPageTransition
-              animationDirection={animationDirection}
-              transitionKey={`${progress?.current ?? 0}-${title ?? "scene"}`}
+            <div
+              className={cn(
+                "relative flex min-h-0 flex-1 items-center overflow-y-auto overscroll-contain py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+                isLocked && "opacity-95",
+              )}
             >
-              {children}
-            </AnimatedPageTransition>
-          </div>
-        </section>
+              {showSideArrows ? <SideArrowNavigation onPrevious={previousAction} onNext={nextAction} /> : null}
+              <SceneRevealItem stage="content" className="flex min-h-full w-full flex-1 items-center">
+                {children}
+              </SceneRevealItem>
+            </div>
+          </section>
 
-        <footer className="shrink-0 pb-[max(1rem,calc(env(safe-area-inset-bottom)+0.75rem))] pt-3">
-          <BottomNavigationControls
-            previousAction={previousAction}
-            nextAction={nextAction}
-            primaryAction={primaryAction}
-          />
-        </footer>
+          <footer className="shrink-0 pb-[max(1rem,calc(env(safe-area-inset-bottom)+0.75rem))] pt-3">
+            <BottomNavigationControls
+              previousAction={previousAction}
+              nextAction={nextAction}
+              primaryAction={primaryAction}
+            />
+          </footer>
+        </AnimatedPageTransition>
       </div>
     </main>
   );

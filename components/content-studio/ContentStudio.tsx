@@ -47,6 +47,7 @@ import type {
 import type { JourneyContentBlock, JourneyMiniGame, JourneyReward, JourneyScene, JourneyTaskResponse } from "@/lib/journey/types";
 import { getChapterNumber } from "@/lib/journey/chapters";
 import { createDefaultProgressivePenaltyConfig, validateProgressivePenaltyConfig } from "@/lib/journey/progressive-penalty";
+import { getSceneCriticalImageUrl } from "@/lib/journey/scene-media";
 import { createDefaultMemoryMatchConfig, createDefaultScratchRevealConfig } from "@/lib/journey/standard-mini-game-config";
 import { cn } from "@/lib/utils";
 import { JsonConfigEditor } from "./JsonConfigEditor";
@@ -1431,6 +1432,8 @@ function ScenePreviewPanel({
                 backgroundVariant={journeyScene.backgroundVariant ?? "night"}
                 isLocked={journeyScene.isLocked}
                 embeddedViewport
+                sceneKey={journeyScene.id}
+                criticalMediaUrl={getSceneCriticalImageUrl(journeyScene)}
                 progress={{ current: 1, total: 1, states: [journeyScene.isLocked ? "locked" : journeyScene.progressIsCompleted ? "completed" : "unlocked"] }}
               >
                 <JourneySceneRenderer

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useSceneNavigationGuard } from "@/hooks/useSceneNavigationGuard";
 import {
   claimJourneyReward,
   completeJourneyScene,
@@ -24,6 +25,7 @@ type RefreshOptions = {
 };
 
 export function useJourneyScenes() {
+  const navigateWithGuard = useSceneNavigationGuard();
   const [accessCode, setAccessCode] = useState(() => readStorage(JOURNEY_ACCESS_CODE_KEY) || DEFAULT_JOURNEY_ACCESS_CODE);
   const [scenes, setScenes] = useState<JourneyScene[]>([]);
   const [currentSceneIndex, setCurrentSceneIndex] = useState(0);
@@ -115,17 +117,21 @@ export function useJourneyScenes() {
       return;
     }
 
-    setDirection("forward");
-    setCurrentSceneIndex((index) => Math.min(index + 1, Math.max(scenes.length - 1, 0)));
-  }, [currentScene, scenes.length]);
+    navigateWithGuard(() => {
+      setDirection("forward");
+      setCurrentSceneIndex((index) => Math.min(index + 1, Math.max(scenes.length - 1, 0)));
+    });
+  }, [currentScene, navigateWithGuard, scenes.length]);
 
   const goPrevious = useCallback(() => {
-    setDirection("backward");
-    setCurrentSceneIndex((index) => {
-      const previousIndex = getPreviousContentSceneIndex(scenes, index);
-      return previousIndex >= 0 ? previousIndex : index;
+    navigateWithGuard(() => {
+      setDirection("backward");
+      setCurrentSceneIndex((index) => {
+        const previousIndex = getPreviousContentSceneIndex(scenes, index);
+        return previousIndex >= 0 ? previousIndex : index;
+      });
     });
-  }, [scenes]);
+  }, [navigateWithGuard, scenes]);
 
   const goToScene = useCallback(
     (nextIndex: number) => {

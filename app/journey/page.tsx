@@ -2,6 +2,7 @@
 
 import { RotateCcw } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
+import { useEffect } from "react";
 import { MobileSceneLayout } from "@/components/layout/MobileSceneLayout";
 import { ChapterRevealScene } from "@/components/scene/ChapterRevealScene";
 import { JourneySceneRenderer } from "@/components/scene/JourneySceneRenderer";
@@ -11,6 +12,7 @@ import { useJourneyScenes } from "@/hooks/useJourneyScenes";
 import { startEmotionalSoundtrack } from "@/lib/audio/emotionalSoundtrack";
 import { getChapterNumber, getNextSceneAfter, getPreviousContentSceneIndex, getProgressScenes } from "@/lib/journey/chapters";
 import { canNavigateForward } from "@/lib/journey/progress";
+import { getNextSceneImageUrl, getSceneCriticalImageUrl, prepareSceneImage } from "@/lib/journey/scene-media";
 import type { JourneyScene } from "@/lib/journey/types";
 
 export default function JourneyPage() {
@@ -34,6 +36,14 @@ export default function JourneyPage() {
     goNext,
     goPrevious,
   } = useJourneyScenes();
+  const criticalMediaUrl = getSceneCriticalImageUrl(currentScene);
+  const nextMediaUrl = getNextSceneImageUrl(scenes, currentSceneIndex);
+
+  useEffect(() => {
+    if (currentScene?.type === "chapter") {
+      void prepareSceneImage(nextMediaUrl);
+    }
+  }, [currentScene?.type, nextMediaUrl]);
 
   if (isLoading) {
     return (
@@ -152,6 +162,9 @@ export default function JourneyPage() {
       animationDirection={direction}
       backgroundVariant={currentScene.backgroundVariant ?? "night"}
       showSoundControl
+      sceneKey={currentScene.id}
+      criticalMediaUrl={criticalMediaUrl}
+      nextMediaUrl={nextMediaUrl}
       primaryAction={getPrimaryAction({
         scene: currentScene,
         canGoNext: canNavigateNext,

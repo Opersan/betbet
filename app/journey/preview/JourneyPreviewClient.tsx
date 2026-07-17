@@ -9,9 +9,11 @@ import { JourneySceneRenderer, type CompleteMiniGameParams } from "@/components/
 import { PremiumCard } from "@/components/ui/PremiumCard";
 import { PrimaryActionButton } from "@/components/ui/PrimaryActionButton";
 import { startEmotionalSoundtrack } from "@/lib/audio/emotionalSoundtrack";
+import { useSceneNavigationGuard } from "@/hooks/useSceneNavigationGuard";
 import { getChapterNumber, getNextSceneAfter, getPreviousContentSceneIndex, getProgressScenes } from "@/lib/journey/chapters";
 import { canNavigateForward } from "@/lib/journey/progress";
 import { getJourneyPreviewScenes } from "@/lib/journey/queries";
+import { getNextSceneImageUrl, getSceneCriticalImageUrl, prepareSceneImage } from "@/lib/journey/scene-media";
 import { findSceneCodeTask } from "@/lib/journey/scene-code-task";
 import type { JourneyReward, JourneyScene, JourneyTaskResponse } from "@/lib/journey/types";
 
@@ -33,8 +35,17 @@ export function JourneyPreviewClient({
   const [chapterReplayKey, setChapterReplayKey] = useState(0);
   const [previewRunKey, setPreviewRunKey] = useState(0);
   const previewObjectUrlsRef = useRef<string[]>([]);
+  const navigateWithGuard = useSceneNavigationGuard();
 
   const currentScene = scenes[currentSceneIndex] ?? null;
+  const criticalMediaUrl = getSceneCriticalImageUrl(currentScene);
+  const nextMediaUrl = getNextSceneImageUrl(scenes, currentSceneIndex);
+
+  useEffect(() => {
+    if (currentScene?.type === "chapter") {
+      void prepareSceneImage(nextMediaUrl);
+    }
+  }, [currentScene?.type, nextMediaUrl]);
 
   const refreshPreview = useCallback(
     async (preferredSlug?: string) => {
@@ -120,18 +131,22 @@ export function JourneyPreviewClient({
       return;
     }
 
-    startEmotionalSoundtrack();
-    setDirection("forward");
-    setCurrentSceneIndex((index) => Math.min(index + 1, Math.max(scenes.length - 1, 0)));
-  }, [currentScene, scenes.length]);
+    navigateWithGuard(() => {
+      startEmotionalSoundtrack();
+      setDirection("forward");
+      setCurrentSceneIndex((index) => Math.min(index + 1, Math.max(scenes.length - 1, 0)));
+    });
+  }, [currentScene, navigateWithGuard, scenes.length]);
 
   const goPrevious = useCallback(() => {
-    setDirection("backward");
-    setCurrentSceneIndex((index) => {
-      const previousIndex = getPreviousContentSceneIndex(scenes, index);
-      return previousIndex >= 0 ? previousIndex : index;
+    navigateWithGuard(() => {
+      setDirection("backward");
+      setCurrentSceneIndex((index) => {
+        const previousIndex = getPreviousContentSceneIndex(scenes, index);
+        return previousIndex >= 0 ? previousIndex : index;
+      });
     });
-  }, [scenes]);
+  }, [navigateWithGuard, scenes]);
 
   const goToScene = useCallback(
     (nextIndex: number) => {
@@ -327,6 +342,9 @@ export function JourneyPreviewClient({
       showSideArrows
       animationDirection={direction}
       backgroundVariant={currentScene.backgroundVariant ?? "deep"}
+      sceneKey={currentScene.id}
+      criticalMediaUrl={criticalMediaUrl}
+      nextMediaUrl={nextMediaUrl}
       primaryAction={getPrimaryAction({
         scene: currentScene,
         canGoNext: canNavigateNext,

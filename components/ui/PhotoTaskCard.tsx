@@ -3,6 +3,7 @@
 import { ChangeEvent, useEffect, useRef, useState } from "react";
 import { Camera, Check, Image as ImageIcon, Upload } from "lucide-react";
 import { motion, useReducedMotion } from "framer-motion";
+import { SceneRevealItem } from "@/components/scene/AnimatedPageTransition";
 import { getJourneyTaskUploadSignedUrl } from "@/lib/journey/queries";
 import type { JourneyScene } from "@/lib/journey/types";
 import { PremiumCard } from "./PremiumCard";
@@ -117,7 +118,7 @@ export function PhotoTaskCard({
         {photoBlock?.body ?? scene.content ?? "Bu anı küçük bir fotoğrafla kaydet."}
       </p>
 
-      <div className="mt-6 overflow-hidden rounded-[8px] border border-white/10 bg-white/[0.045]">
+      <SceneRevealItem stage="media" className="mt-6 overflow-hidden rounded-[8px] border border-white/10 bg-white/[0.045]">
         {imageUrl ? (
           <motion.div
             initial={reduceMotion ? false : { opacity: 0, scale: 0.975, filter: "blur(8px)" }}
@@ -137,7 +138,7 @@ export function PhotoTaskCard({
             <span className="text-sm font-medium">Fotoğraf seç veya çek</span>
           </button>
         )}
-      </div>
+      </SceneRevealItem>
 
       {imageError ? <p className="mt-3 text-sm leading-6 text-[#f0b7c6]">{imageError}</p> : null}
 
@@ -150,7 +151,7 @@ export function PhotoTaskCard({
         onChange={handleFileChange}
       />
 
-      <div className="mt-6 grid gap-3">
+      <SceneRevealItem stage="action" className="mt-6 grid gap-3">
         <button
           className="inline-flex min-h-12 items-center justify-center gap-2 rounded-full border border-white/12 bg-white/[0.07] px-4 text-sm font-medium text-[#fffaf2]/82 backdrop-blur transition hover:bg-white/[0.1] active:translate-y-px"
           type="button"
@@ -165,7 +166,7 @@ export function PhotoTaskCard({
           {isSubmitBusy ? "Kaydediliyor" : isCompleted && !selectedFile ? "Kalbime Kaydedildi" : "Fotoğrafı Kaydet"}
           <Upload size={18} strokeWidth={1.7} />
         </PrimaryActionButton>
-      </div>
+      </SceneRevealItem>
     </PremiumCard>
   );
 }

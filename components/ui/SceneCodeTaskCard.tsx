@@ -4,6 +4,7 @@ import { motion, useReducedMotion } from "framer-motion";
 import { AlertTriangle, Check, KeyRound, Lightbulb } from "lucide-react";
 import { type FormEvent, useRef, useState } from "react";
 import { normalizeSceneCode, type SceneCodeTaskDefinition } from "@/lib/journey/scene-code-task";
+import { SceneRevealItem } from "@/components/scene/AnimatedPageTransition";
 import { cn } from "@/lib/utils";
 import { PremiumCard } from "./PremiumCard";
 import { PrimaryActionButton } from "./PrimaryActionButton";
@@ -129,10 +130,12 @@ export function SceneCodeTaskCard({
             ) : null}
           </div>
 
-          <PrimaryActionButton type="submit" disabled={isInputLocked || input.trim().length === 0}>
-            {isSubmitting ? "Doğrulanıyor" : config.submitLabel}
-            <Check size={18} strokeWidth={1.8} aria-hidden="true" />
-          </PrimaryActionButton>
+          <SceneRevealItem stage="action">
+            <PrimaryActionButton type="submit" disabled={isInputLocked || input.trim().length === 0}>
+              {isSubmitting ? "Doğrulanıyor" : config.submitLabel}
+              <Check size={18} strokeWidth={1.8} aria-hidden="true" />
+            </PrimaryActionButton>
+          </SceneRevealItem>
         </form>
       )}
 

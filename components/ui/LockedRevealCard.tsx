@@ -2,6 +2,7 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import { LockKeyhole, Sparkles } from "lucide-react";
+import { SceneRevealItem } from "@/components/scene/AnimatedPageTransition";
 import { cn } from "@/lib/utils";
 import { PremiumCard } from "./PremiumCard";
 import { PrimaryActionButton } from "./PrimaryActionButton";
@@ -53,12 +54,12 @@ export function LockedRevealCard({
           >
             {unlockCondition ?? "Açılacağı ana kadar bu bölüm kapalı kalacak."}
           </motion.p>
-          <div className="mt-7">
+          <SceneRevealItem stage="action" className="mt-7">
             <PrimaryActionButton disabled onClick={onReveal}>
               {lockedLabel}
               <LockKeyhole size={18} strokeWidth={1.7} />
             </PrimaryActionButton>
-          </div>
+          </SceneRevealItem>
         </div>
       ) : (
         <RevealAnimation>

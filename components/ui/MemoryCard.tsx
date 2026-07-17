@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Camera } from "lucide-react";
+import { SceneRevealItem } from "@/components/scene/AnimatedPageTransition";
 import { PositionedImage } from "./PositionedImage";
 import { PremiumCard } from "./PremiumCard";
 
@@ -21,7 +22,7 @@ export function MemoryCard({
 
   return (
     <PremiumCard className="w-full p-4">
-      <div className="relative aspect-[4/5] max-h-[min(48dvh,22rem)] w-full overflow-hidden rounded-[8px] border border-white/10 bg-white/[0.06]">
+      <SceneRevealItem stage="media" className="relative aspect-[4/5] max-h-[min(48dvh,22rem)] w-full overflow-hidden rounded-[8px] border border-white/10 bg-white/[0.06]">
         {showImage ? (
           <PositionedImage
             value={imageUrl}
@@ -36,7 +37,7 @@ export function MemoryCard({
             </div>
           </div>
         )}
-      </div>
+      </SceneRevealItem>
       <div className="px-2 pb-2 pt-5">
         {dateLabel ? (
           <p className="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-[#f4dcc0]/78">{dateLabel}</p>

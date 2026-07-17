@@ -2,6 +2,7 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import { Check, HeartHandshake } from "lucide-react";
+import { SceneRevealItem } from "@/components/scene/AnimatedPageTransition";
 import { cn } from "@/lib/utils";
 import { PremiumCard } from "./PremiumCard";
 import { PrimaryActionButton } from "./PrimaryActionButton";
@@ -43,7 +44,7 @@ export function TaskCard({
           ? "Bu an kaybolmadı. Şimdi hikayenin bir sonraki ışığına geçebiliriz."
           : "Acele etme. Bu sahne küçük ama hikayenin içinde senin yerin olsun diye var."}
       </p>
-      <div className="mt-7">
+      <SceneRevealItem stage="action" className="mt-7">
         <PrimaryActionButton
           onClick={onComplete}
           disabled={isCompleted || isSubmitting}
@@ -52,7 +53,7 @@ export function TaskCard({
           {isCompleted ? "Kalbime Kaydedildi" : isSubmitting ? "Kaydediliyor" : "Tamamladım"}
           <Check size={18} strokeWidth={1.8} />
         </PrimaryActionButton>
-      </div>
+      </SceneRevealItem>
     </PremiumCard>
   );
 }

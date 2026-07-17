@@ -1,7 +1,9 @@
 "use client";
 
 import { ArrowLeft, ArrowRight } from "lucide-react";
+import { motion } from "framer-motion";
 import type { ReactNode } from "react";
+import { useSceneRevealMotion } from "@/components/scene/AnimatedPageTransition";
 import { PrimaryActionButton } from "@/components/ui/PrimaryActionButton";
 
 export type SceneAction = {
@@ -20,6 +22,9 @@ export function BottomNavigationControls({
   nextAction?: () => void;
   primaryAction?: SceneAction;
 }) {
+  const actionReveal = useSceneRevealMotion("action");
+  const navigationReveal = useSceneRevealMotion("navigation");
+
   if (!primaryAction && !previousAction && !nextAction) {
     return null;
   }
@@ -51,18 +56,23 @@ export function BottomNavigationControls({
   return (
     <div className="space-y-3">
       {primaryAction ? (
-        <PrimaryActionButton
-          href={primaryAction.href}
-          onClick={primaryAction.onClick}
-          disabled={primaryAction.disabled}
-        >
-          {primaryAction.label}
-          <ArrowRight size={18} strokeWidth={1.7} />
-        </PrimaryActionButton>
+        <motion.div {...actionReveal}>
+          <PrimaryActionButton
+            href={primaryAction.href}
+            onClick={primaryAction.onClick}
+            disabled={primaryAction.disabled}
+          >
+            {primaryAction.label}
+            <ArrowRight size={18} strokeWidth={1.7} />
+          </PrimaryActionButton>
+        </motion.div>
       ) : null}
 
       {navActions.length > 0 ? (
-        <div className={navActions.length === 1 ? "grid grid-cols-1 gap-3" : "grid grid-cols-2 gap-3"}>
+        <motion.div
+          {...navigationReveal}
+          className={navActions.length === 1 ? "grid grid-cols-1 gap-3" : "grid grid-cols-2 gap-3"}
+        >
           {navActions.map((action) => (
             <button
               key={action.key}
@@ -75,7 +85,7 @@ export function BottomNavigationControls({
               {action.key === "next" ? action.icon : null}
             </button>
           ))}
-        </div>
+        </motion.div>
       ) : null}
     </div>
   );

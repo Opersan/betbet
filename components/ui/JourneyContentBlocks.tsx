@@ -1,6 +1,7 @@
 "use client";
 
 import { AlertTriangle, Music2, Quote, Video } from "lucide-react";
+import { SceneRevealItem } from "@/components/scene/AnimatedPageTransition";
 import type { JourneyContentBlock } from "@/lib/journey/types";
 import { PositionedImage } from "./PositionedImage";
 import { PremiumCard } from "./PremiumCard";
@@ -20,12 +21,12 @@ export function JourneyContentBlocks({ blocks }: { blocks: JourneyContentBlock[]
         if (block.type === "image" && block.mediaUrl) {
           return (
             <PremiumCard key={block.id} className="w-full p-3">
-              <div className="relative aspect-[4/5] overflow-hidden rounded-[8px] border border-white/10 bg-black/24">
+              <SceneRevealItem stage="media" className="relative aspect-[4/5] overflow-hidden rounded-[8px] border border-white/10 bg-black/24">
                 <PositionedImage
                   value={block.mediaUrl}
                   alt={block.altText ?? block.title ?? ""}
                 />
-              </div>
+              </SceneRevealItem>
               {block.title ? <p className="px-2 pt-4 text-lg font-semibold text-[#fffaf2]">{block.title}</p> : null}
               {block.body ? <p className="px-2 pb-2 pt-2 text-sm leading-6 text-[#fffaf2]/68">{block.body}</p> : null}
             </PremiumCard>
@@ -39,9 +40,9 @@ export function JourneyContentBlocks({ blocks }: { blocks: JourneyContentBlock[]
         if (block.type === "video" && block.mediaUrl) {
           return (
             <PremiumCard key={block.id} className="w-full p-3">
-              <div className="overflow-hidden rounded-[8px] border border-white/10 bg-black/24">
+              <SceneRevealItem stage="media" className="overflow-hidden rounded-[8px] border border-white/10 bg-black/24">
                 <video className="aspect-[4/5] w-full object-cover" src={block.mediaUrl} controls playsInline preload="metadata" />
-              </div>
+              </SceneRevealItem>
               <div className="px-2 pb-2 pt-4">
                 <Video className="mb-2 text-[#f4dcc0]" size={18} strokeWidth={1.6} />
                 {block.title ? <p className="text-lg font-semibold text-[#fffaf2]">{block.title}</p> : null}
