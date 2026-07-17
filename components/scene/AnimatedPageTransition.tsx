@@ -202,3 +202,7 @@ export function useSceneRevealMotion(
     transition: { duration, delay, ease: [0.16, 1, 0.3, 1] },
   };
 }
+
+export function useSceneRevealStatus() {
+  return useContext(SceneRevealContext);
+}

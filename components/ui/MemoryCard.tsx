@@ -5,6 +5,7 @@ import { Camera } from "lucide-react";
 import { SceneRevealItem } from "@/components/scene/AnimatedPageTransition";
 import { PositionedImage } from "./PositionedImage";
 import { PremiumCard } from "./PremiumCard";
+import { ReadingTypewriterText } from "./ReadingTypewriterText";
 
 export function MemoryCard({
   imageUrl,
@@ -43,7 +44,11 @@ export function MemoryCard({
           <p className="mb-2 text-xs font-medium uppercase tracking-[0.18em] text-[#f4dcc0]/78">{dateLabel}</p>
         ) : null}
         <h3 className="text-2xl font-semibold leading-tight text-[#fffaf2]">{title}</h3>
-        {content ? <p className="mt-3 text-base leading-7 text-[#fffaf2]/70">{content}</p> : null}
+        {content ? (
+          <p className="mt-3 text-base leading-7 text-[#fffaf2]/70">
+            <ReadingTypewriterText text={content} />
+          </p>
+        ) : null}
       </div>
     </PremiumCard>
   );

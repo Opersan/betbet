@@ -9,6 +9,7 @@ import { MiniGameCard } from "@/components/ui/MiniGameCard";
 import { PhotoTaskCard } from "@/components/ui/PhotoTaskCard";
 import { PremiumCard } from "@/components/ui/PremiumCard";
 import { RewardRevealStack } from "@/components/ui/RewardRevealStack";
+import { ReadingTypewriterText } from "@/components/ui/ReadingTypewriterText";
 import { SceneCodeTaskCard } from "@/components/ui/SceneCodeTaskCard";
 import { TaskCard } from "@/components/ui/TaskCard";
 import { findSceneCodeTask } from "@/lib/journey/scene-code-task";
@@ -150,7 +151,13 @@ export function JourneySceneRenderer({
             {scene.dateLabel}
           </p>
         ) : null}
-        <p className="text-2xl font-semibold leading-tight text-[#fffaf2]">{scene.content}</p>
+        <p className="text-2xl font-semibold leading-tight text-[#fffaf2]">
+          {scene.type === "story" && scene.content ? (
+            <ReadingTypewriterText text={scene.content} />
+          ) : (
+            scene.content
+          )}
+        </p>
         {scene.progressIsCompleted ? (
           <div className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#f4dcc0]/20 bg-[#f4dcc0]/10 px-3 py-2 text-sm text-[#f4dcc0]">
             <Check size={16} strokeWidth={1.8} />
