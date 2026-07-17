@@ -9,7 +9,7 @@ import { PremiumCard } from "@/components/ui/PremiumCard";
 import { PrimaryActionButton } from "@/components/ui/PrimaryActionButton";
 import { useJourneyScenes } from "@/hooks/useJourneyScenes";
 import { startEmotionalSoundtrack } from "@/lib/audio/emotionalSoundtrack";
-import { getChapterNumber, getNextSceneAfter, getProgressScenes } from "@/lib/journey/chapters";
+import { getChapterNumber, getNextSceneAfter, getPreviousContentSceneIndex, getProgressScenes } from "@/lib/journey/chapters";
 import { canNavigateForward } from "@/lib/journey/progress";
 import type { JourneyScene } from "@/lib/journey/types";
 
@@ -96,6 +96,7 @@ export default function JourneyPage() {
   }
 
   const canNavigateNext = currentSceneIndex < scenes.length - 1 && canNavigateForward(currentScene);
+  const previousSceneIndex = getPreviousContentSceneIndex(scenes, currentSceneIndex);
 
   if (currentScene.type === "chapter" && !currentScene.isLocked) {
     return (
@@ -109,7 +110,11 @@ export default function JourneyPage() {
         previewMode={false}
         onComplete={() => {
           if (direction === "backward") {
-            if (currentSceneIndex > 0) goPrevious();
+            if (previousSceneIndex >= 0) {
+              goPrevious();
+            } else if (getNextSceneAfter(scenes, currentScene.id)) {
+              goNext();
+            }
             return;
           }
 
@@ -119,7 +124,7 @@ export default function JourneyPage() {
     );
   }
 
-  const canNavigatePrevious = currentSceneIndex > 0;
+  const canNavigatePrevious = previousSceneIndex >= 0;
   const progressScenes = getProgressScenes(scenes);
   const progressIndex = progressScenes.findIndex((scene) => scene.id === currentScene.id);
   const progressStates = progressScenes.map((scene) => {

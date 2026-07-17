@@ -10,6 +10,7 @@ import {
   saveJourneyTaskResponse,
   uploadJourneyTaskPhoto,
 } from "@/lib/journey/queries";
+import { getPreviousContentSceneIndex } from "@/lib/journey/chapters";
 import { canNavigateForward, resolveInitialSceneIndex } from "@/lib/journey/progress";
 import type { JourneyScene } from "@/lib/journey/types";
 
@@ -121,8 +122,11 @@ export function useJourneyScenes() {
 
   const goPrevious = useCallback(() => {
     setDirection("backward");
-    setCurrentSceneIndex((index) => Math.max(index - 1, 0));
-  }, []);
+    setCurrentSceneIndex((index) => {
+      const previousIndex = getPreviousContentSceneIndex(scenes, index);
+      return previousIndex >= 0 ? previousIndex : index;
+    });
+  }, [scenes]);
 
   const goToScene = useCallback(
     (nextIndex: number) => {

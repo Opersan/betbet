@@ -9,7 +9,7 @@ import { JourneySceneRenderer, type CompleteMiniGameParams } from "@/components/
 import { PremiumCard } from "@/components/ui/PremiumCard";
 import { PrimaryActionButton } from "@/components/ui/PrimaryActionButton";
 import { startEmotionalSoundtrack } from "@/lib/audio/emotionalSoundtrack";
-import { getChapterNumber, getNextSceneAfter, getProgressScenes } from "@/lib/journey/chapters";
+import { getChapterNumber, getNextSceneAfter, getPreviousContentSceneIndex, getProgressScenes } from "@/lib/journey/chapters";
 import { canNavigateForward } from "@/lib/journey/progress";
 import { getJourneyPreviewScenes } from "@/lib/journey/queries";
 import type { JourneyReward, JourneyScene, JourneyTaskResponse } from "@/lib/journey/types";
@@ -104,7 +104,8 @@ export function JourneyPreviewClient({
   const canNavigateNext = Boolean(
     currentScene && currentSceneIndex < scenes.length - 1 && canNavigateForward(currentScene),
   );
-  const canNavigatePrevious = currentSceneIndex > 0;
+  const previousSceneIndex = getPreviousContentSceneIndex(scenes, currentSceneIndex);
+  const canNavigatePrevious = previousSceneIndex >= 0;
   const progressScenes = getProgressScenes(scenes);
   const progressIndex = currentScene
     ? progressScenes.findIndex((scene) => scene.id === currentScene.id)
@@ -123,8 +124,11 @@ export function JourneyPreviewClient({
 
   const goPrevious = useCallback(() => {
     setDirection("backward");
-    setCurrentSceneIndex((index) => Math.max(index - 1, 0));
-  }, []);
+    setCurrentSceneIndex((index) => {
+      const previousIndex = getPreviousContentSceneIndex(scenes, index);
+      return previousIndex >= 0 ? previousIndex : index;
+    });
+  }, [scenes]);
 
   const goToScene = useCallback(
     (nextIndex: number) => {
@@ -268,6 +272,15 @@ export function JourneyPreviewClient({
           allowSkip
           previewMode
           onComplete={() => {
+            if (direction === "backward") {
+              if (previousSceneIndex >= 0) {
+                goPrevious();
+              } else if (getNextSceneAfter(scenes, currentScene.id)) {
+                goNext();
+              }
+              return;
+            }
+
             if (getNextSceneAfter(scenes, currentScene.id)) goNext();
           }}
         />

@@ -35,3 +35,16 @@ export function getNextSceneAfter<T extends { id: string }>(
 export function getProgressScenes<T extends { type: SceneType }>(scenes: readonly T[]): T[] {
   return scenes.filter((scene) => scene.type !== "chapter");
 }
+
+export function getPreviousContentSceneIndex<T extends { type: SceneType }>(
+  scenes: readonly T[],
+  currentIndex: number,
+): number {
+  for (let index = currentIndex - 1; index >= 0; index -= 1) {
+    if (scenes[index]?.type !== "chapter") {
+      return index;
+    }
+  }
+
+  return -1;
+}
