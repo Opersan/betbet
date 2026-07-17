@@ -26,7 +26,6 @@ export default function JourneyPage() {
     isCompleting,
     isUploading,
     error,
-    lastCompletedSlug,
     refreshScenes,
     completeScene,
     submitPhotoTask,
@@ -160,16 +159,6 @@ export default function JourneyPage() {
       })}
     >
       <div className="relative w-full">
-        {lastCompletedSlug && !currentScene.isLocked ? (
-          <motion.div
-            initial={reduceMotion ? false : { opacity: 0, y: 10, scale: 0.985 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.68, delay: 0.08, ease: [0.16, 1, 0.3, 1] }}
-            className="mb-3 rounded-full border border-[#f4dcc0]/18 bg-[#f4dcc0]/10 px-4 py-2 text-center text-xs font-medium text-[#f4dcc0]/86"
-          >
-            Bir sayfa daha usulca açıldı.
-          </motion.div>
-        ) : null}
         <JourneySceneRenderer
           scene={currentScene}
           isSubmitting={isCompleting || isUploading}

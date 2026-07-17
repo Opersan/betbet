@@ -33,7 +33,6 @@ export function useJourneyScenes() {
   const [isCompleting, setIsCompleting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastCompletedSlug, setLastCompletedSlug] = useState<string | null>(null);
   const completionMutationKeysRef = useRef(new Set<string>());
   const photoMutationKeysRef = useRef(new Set<string>());
 
@@ -161,7 +160,6 @@ export function useJourneyScenes() {
         const nextSceneSlug = nextIndex >= 0 ? nextScenes[nextIndex]?.slug : sceneSlug;
 
         setScenes(nextScenes);
-        setLastCompletedSlug(sceneSlug);
 
         if (nextIndex >= 0) {
           setDirection("forward");
@@ -196,7 +194,6 @@ export function useJourneyScenes() {
         await uploadJourneyTaskPhoto({ code: accessCode, sceneSlug, file, rewardKey });
         const nextScenes = await refreshScenes({ nextSceneSlug: sceneSlug, preserveCurrentScene: false });
         setScenes(nextScenes);
-        setLastCompletedSlug(sceneSlug);
       } catch (caughtError) {
         setError(getErrorMessage(caughtError));
       } finally {
@@ -239,7 +236,6 @@ export function useJourneyScenes() {
           completeScene: true,
         });
         await refreshScenes({ nextSceneSlug: sceneSlug, preserveCurrentScene: false });
-        setLastCompletedSlug(sceneSlug);
       } catch (caughtError) {
         setError(getErrorMessage(caughtError));
       } finally {
@@ -282,7 +278,6 @@ export function useJourneyScenes() {
       isCompleting,
       isUploading,
       error,
-      lastCompletedSlug,
       refreshScenes,
       completeScene,
       submitPhotoTask,
@@ -304,7 +299,6 @@ export function useJourneyScenes() {
       isCompleting,
       isUploading,
       error,
-      lastCompletedSlug,
       refreshScenes,
       completeScene,
       submitPhotoTask,
