@@ -9,7 +9,9 @@ import { MiniGameCard } from "@/components/ui/MiniGameCard";
 import { PhotoTaskCard } from "@/components/ui/PhotoTaskCard";
 import { PremiumCard } from "@/components/ui/PremiumCard";
 import { RewardRevealStack } from "@/components/ui/RewardRevealStack";
+import { SceneCodeTaskCard } from "@/components/ui/SceneCodeTaskCard";
 import { TaskCard } from "@/components/ui/TaskCard";
+import { findSceneCodeTask } from "@/lib/journey/scene-code-task";
 import type { JourneyScene } from "@/lib/journey/types";
 
 export type CompleteMiniGameParams = {
@@ -65,6 +67,23 @@ export function JourneySceneRenderer({
       return (
         <SceneStack>
           <PhotoTaskCard scene={scene} isSubmitting={isSubmitting} onSubmit={onSubmitPhoto} />
+          <RewardRevealStack rewards={scene.rewards} isBusy={isSubmitting} onUnlock={onUnlockReward} />
+        </SceneStack>
+      );
+    }
+
+    const codeTask = findSceneCodeTask(scene.contentBlocks);
+
+    if (codeTask) {
+      return (
+        <SceneStack>
+          <SceneCodeTaskCard
+            task={codeTask}
+            fallbackTitle={scene.content ?? scene.title}
+            isCompleted={scene.progressIsCompleted}
+            isSubmitting={isSubmitting}
+            onComplete={onComplete}
+          />
           <RewardRevealStack rewards={scene.rewards} isBusy={isSubmitting} onUnlock={onUnlockReward} />
         </SceneStack>
       );

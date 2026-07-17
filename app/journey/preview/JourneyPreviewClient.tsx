@@ -12,6 +12,7 @@ import { startEmotionalSoundtrack } from "@/lib/audio/emotionalSoundtrack";
 import { getChapterNumber, getNextSceneAfter, getPreviousContentSceneIndex, getProgressScenes } from "@/lib/journey/chapters";
 import { canNavigateForward } from "@/lib/journey/progress";
 import { getJourneyPreviewScenes } from "@/lib/journey/queries";
+import { findSceneCodeTask } from "@/lib/journey/scene-code-task";
 import type { JourneyReward, JourneyScene, JourneyTaskResponse } from "@/lib/journey/types";
 
 export function JourneyPreviewClient({
@@ -89,8 +90,10 @@ export function JourneyPreviewClient({
   }, [code, rpcPreviewToken]);
 
   useEffect(() => {
+    const previewObjectUrls = previewObjectUrlsRef.current;
+
     return () => {
-      previewObjectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+      previewObjectUrls.forEach((url) => URL.revokeObjectURL(url));
     };
   }, []);
 
@@ -147,6 +150,12 @@ export function JourneyPreviewClient({
 
   const completeSceneLocally = useCallback(
     (sceneSlug: string) => {
+      const completedIndex = scenes.findIndex((scene) => scene.slug === sceneSlug);
+      const completedScene = completedIndex >= 0 ? scenes[completedIndex] : null;
+      const shouldAutoAdvance = Boolean(
+        completedScene?.type === "task" && findSceneCodeTask(completedScene.contentBlocks),
+      );
+
       setIsBusy(true);
       updateScene(sceneSlug, (scene) => ({
         ...scene,
@@ -154,9 +163,17 @@ export function JourneyPreviewClient({
         completedAt: new Date().toISOString(),
       }));
       setLastCompletedSlug(sceneSlug);
-      window.setTimeout(() => setIsBusy(false), 220);
+      window.setTimeout(() => {
+        setIsBusy(false);
+
+        if (shouldAutoAdvance && completedIndex < scenes.length - 1) {
+          setDirection("forward");
+          setCurrentSceneIndex(completedIndex + 1);
+          setLastCompletedSlug(null);
+        }
+      }, shouldAutoAdvance ? 520 : 220);
     },
-    [updateScene],
+    [scenes, updateScene],
   );
 
   const submitPhotoLocally = useCallback(
