@@ -108,6 +108,11 @@ export default function JourneyPage() {
         allowSkip
         previewMode={false}
         onComplete={() => {
+          if (direction === "backward") {
+            if (currentSceneIndex > 0) goPrevious();
+            return;
+          }
+
           if (getNextSceneAfter(scenes, currentScene.id)) goNext();
         }}
       />
